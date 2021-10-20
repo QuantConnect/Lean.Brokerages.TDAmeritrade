@@ -9,10 +9,10 @@
         <Copyright>Copyright ©  2021</Copyright>
         <TestProjectType>UnitTest</TestProjectType>
         <OutputPath>bin\$(Configuration)\</OutputPath>
-        <Product>QuantConnect.TemplateBrokerage.Tests</Product>
-        <AssemblyName>QuantConnect.TemplateBrokerage.Tests</AssemblyName>
-        <RootNamespace>QuantConnect.TemplateBrokerage.Tests</RootNamespace>
-        <AssemblyTitle>QuantConnect.TemplateBrokerage.Tests</AssemblyTitle>
+        <Product>QuantConnect.TDAmeritradeDownloader.Tests</Product>
+        <AssemblyName>QuantConnect.TDAmeritradeDownloader.Tests</AssemblyName>
+        <RootNamespace>QuantConnect.TDAmeritradeDownloader.Tests</RootNamespace>
+        <AssemblyTitle>QuantConnect.TDAmeritradeDownloader.Tests</AssemblyTitle>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
 

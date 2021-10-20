@@ -19,7 +19,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Tests.Brokerages;
 
-namespace QuantConnect.TemplateBrokerage.Tests
+namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
     [TestFixture, Ignore("Not implemented")]
     public partial class TDAmeritradeBrokerageTests : BrokerageTests

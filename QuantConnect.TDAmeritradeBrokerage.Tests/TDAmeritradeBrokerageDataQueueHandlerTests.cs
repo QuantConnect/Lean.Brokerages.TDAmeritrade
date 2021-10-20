@@ -19,8 +19,9 @@ using QuantConnect.Data;
 using QuantConnect.Tests;
 using QuantConnect.Logging;
 using QuantConnect.Data.Market;
+using QuantConnect.Brokerages.TDAmeritrade;
 
-namespace QuantConnect.TemplateBrokerage.Tests
+namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
     [TestFixture]
     public partial class TDAmeritradeBrokerageTests

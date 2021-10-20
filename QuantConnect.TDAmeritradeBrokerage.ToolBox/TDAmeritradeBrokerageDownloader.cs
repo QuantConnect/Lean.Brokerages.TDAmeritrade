@@ -11,30 +11,32 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
 */
 
-using System;
+using QuantConnect.Brokerages.TDAmeritrade;
+using QuantConnect.Configuration;
 using QuantConnect.Data;
+using QuantConnect.Util;
+using System;
 using System.Collections.Generic;
+using TDAmeritradeApi.Client;
 
-namespace QuantConnect.TemplateBrokerage.ToolBox
+namespace QuantConnect.TDAmeritradeDownloader.ToolBox
 {
-    /// <summary>
-    /// Template Brokerage Data Downloader implementation
-    /// </summary>
     public class TDAmeritradeBrokerageDownloader : IDataDownloader
     {
-        /// <summary>
-        /// Get historical data enumerable for a single symbol, type and resolution given this start and end time (in UTC).
-        /// </summary>
-        /// <param name="symbol">Symbol for the data we're looking for.</param>
-        /// <param name="resolution">Resolution of the data request</param>
-        /// <param name="startUtc">Start time of the data in UTC</param>
-        /// <param name="endUtc">End time of the data in UTC</param>
-        /// <returns>Enumerable of base data for this symbol</returns>
+        public TDAmeritradeBrokerageDownloader()
+        {
+            var clientID = Config.Get("td-client-id", "");
+            var redirectUri = Config.Get("td-redirect-uri", "");
+            var tdCredentials = Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get("td-credentials-provider", "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider"));
+            TDAmeritradeBrokerage.InitializeClient(clientID, redirectUri, tdCredentials);
+        }
+
         public IEnumerable<BaseData> Get(Symbol symbol, Resolution resolution, DateTime startUtc, DateTime endUtc)
         {
-            throw new NotImplementedException();
+            return TDAmeritradeBrokerage.GetPriceHistory(symbol, resolution, startUtc, endUtc, TimeZones.NewYork);
         }
     }
 }

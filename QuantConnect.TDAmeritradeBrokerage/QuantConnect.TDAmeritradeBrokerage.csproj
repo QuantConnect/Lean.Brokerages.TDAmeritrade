@@ -1,12 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <TargetFramework>net5.0</TargetFramework>
-    <Product>QuantConnect.TemplateBrokerage</Product>
-    <AssemblyName>QuantConnect.TemplateBrokerage</AssemblyName>
-    <RootNamespace>QuantConnect.TemplateBrokerage</RootNamespace>
-    <AssemblyTitle>QuantConnect.TemplateBrokerage</AssemblyTitle>
+    <Product>QuantConnect.TDAmeritradeDownloader</Product>
+    <AssemblyName>QuantConnect.TDAmeritradeDownloader</AssemblyName>
+    <RootNamespace>QuantConnect.TDAmeritradeDownloader</RootNamespace>
+    <AssemblyTitle>QuantConnect.TDAmeritradeDownloader</AssemblyTitle>
     <OutputType>Library</OutputType>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -27,6 +27,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="TDAmeritradeApi.Client" Version="1.2.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Lean\Brokerages\QuantConnect.Brokerages.csproj" />

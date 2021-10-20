@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -13,12 +13,36 @@
  * limitations under the License.
 */
 
-using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using TDAmeritradeApi.Client;
 
-namespace QuantConnect.TDAmeritradeDownloader.Tests
+namespace QuantConnect.Brokerages.TDAmeritrade
 {
-    [TestFixture, Ignore("Not implemented")]
-    public class TDAmeritradeBrokerageAdditionalTests
+    public class TDCliCredentialProvider : ICredentials
     {
+        public string GetPassword()
+        {
+            Console.WriteLine("Password: ");
+
+            return Console.ReadLine();
+        }
+
+        public string GetSmsCode()
+        {
+            Console.WriteLine("Sms code: ");
+
+            return Console.ReadLine();
+        }
+
+        public string GetUserName()
+        {
+            Console.WriteLine("Username: ");
+
+            return Console.ReadLine();
+        }
     }
 }

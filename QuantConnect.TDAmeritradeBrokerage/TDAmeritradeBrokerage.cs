@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -11,104 +11,134 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
 */
 
 using System;
-using System.Linq;
-using QuantConnect.Data;
-using QuantConnect.Orders;
-using QuantConnect.Packets;
-using QuantConnect.Interfaces;
-using QuantConnect.Securities;
-using QuantConnect.Brokerages;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using QuantConnect.Data;
+using QuantConnect.Interfaces;
+using QuantConnect.Logging;
+using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
+using QuantConnect.Orders.TimeInForces;
+using QuantConnect.Securities;
+using QuantConnect.Securities.Equity;
+using QuantConnect.Util;
+using RestSharp;
+using TDAmeritradeApi.Client;
+using TDAmeritradeApi.Client.Models;
+using TDAmeritradeApi.Client.Models.AccountsAndTrading;
+using TDAmeritradeApi.Client.Models.MarketData;
+using AccountsAndTrading = TDAmeritradeApi.Client.Models.AccountsAndTrading;
 
-namespace QuantConnect.TemplateBrokerage
+namespace QuantConnect.Brokerages.TDAmeritrade
 {
+    /// <summary>
+    /// Tradier Class:
+    ///  - Handle authentication.
+    ///  - Data requests.
+    ///  - Rate limiting.
+    ///  - Placing orders.
+    ///  - Getting user data.
+    /// </summary>
     [BrokerageFactory(typeof(TDAmeritradeBrokerageFactory))]
-    public class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
+    public partial class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider, IHistoryProvider, IOptionChainProvider
     {
+        private readonly string _accountId;
+        private readonly string _clientId;
+        private readonly string _redirectUri;
+
+        // we're reusing the equity exchange here to grab typical exchange hours
+        private static readonly EquityExchange Exchange =
+            new EquityExchange(MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.USA, null, SecurityType.Equity));
+
+        private readonly SymbolPropertiesDatabase _symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
+
+        // polling timer for checking for fill events
+        private readonly Timer _orderFillTimer;
+        private static TDAmeritradeClient tdClient;
+
+        private readonly IAlgorithm _algorithm;
+        private readonly IOrderProvider _orderProvider;
+        private readonly ISecurityProvider _securityProvider;
         private readonly IDataAggregator _aggregator;
+
         private readonly EventBasedDataQueueHandlerSubscriptionManager _subscriptionManager;
+
+        /// <summary>
+        /// Returns the brokerage account's base currency
+        /// </summary>
+        public override string AccountBaseCurrency => Currencies.USD;
+
+        /// <summary>
+        /// Create a new Tradier Object:
+        /// </summary>
+        public TDAmeritradeBrokerage(
+            IAlgorithm algorithm,
+            IOrderProvider orderProvider,
+            ISecurityProvider securityProvider,
+            IDataAggregator aggregator,
+            string accountId,
+            string clientId,
+            string redirectUri,
+            ICredentials tdCredentials)
+            : base("TD Ameritrade Brokerage")
+        {
+            _algorithm = algorithm;
+            _orderProvider = orderProvider;
+            _securityProvider = securityProvider;
+            _aggregator = aggregator;
+            _accountId = accountId;
+            _clientId = clientId;
+            _redirectUri = redirectUri;
+
+
+            _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
+            _subscriptionManager.SubscribeImpl += Subscribe;
+            _subscriptionManager.UnsubscribeImpl += Unsubscribe;
+            InitializeClient(clientId, redirectUri, tdCredentials);
+        }
+
+        public static void InitializeClient(string clientId, string redirectUri, ICredentials tdCredentials)
+        {
+            if (tdClient == null)
+            {
+                tdClient = new TDAmeritradeClient(clientId, redirectUri);
+                tdClient.LogIn(tdCredentials).Wait();
+            }
+        }
+
+        #region IBrokerage implementation
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
-        public override bool IsConnected { get; }
-
-        /// <summary>
-         /// Creates a new instance
-         /// </summary>
-        /// <param name="aggregator">consolidate ticks</param>
-        public TDAmeritradeBrokerage(IDataAggregator aggregator) : base("TemplateBrokerage")
-        {
-            _aggregator = aggregator;
-            _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
-            _subscriptionManager.SubscribeImpl += (s, t) => Subscribe(s);
-            _subscriptionManager.UnsubscribeImpl += (s, t) => Unsubscribe(s);
-
-            // Useful for some brokerages:
-
-            // Brokerage helper class to lock websocket message stream while executing an action, for example placing an order
-            // avoid race condition with placing an order and getting filled events before finished placing
-            // _messageHandler = new BrokerageConcurrentMessageHandler<>();
-
-            // Rate gate limiter useful for API/WS calls
-            // _connectionRateLimiter = new RateGate();
-        }
-
-        #region IDataQueueHandler
-
-        /// <summary>
-        /// Subscribe to the specified configuration
-        /// </summary>
-        /// <param name="dataConfig">defines the parameters to subscribe to a data feed</param>
-        /// <param name="newDataAvailableHandler">handler to be fired on new data available</param>
-        /// <returns>The new enumerator for this subscription request</returns>
-        public IEnumerator<BaseData> Subscribe(SubscriptionDataConfig dataConfig, EventHandler newDataAvailableHandler)
-        {
-            if (!CanSubscribe(dataConfig.Symbol))
-            {
-                return Enumerable.Empty<BaseData>().GetEnumerator();
-            }
-
-            var enumerator = _aggregator.Add(dataConfig, newDataAvailableHandler);
-            _subscriptionManager.Subscribe(dataConfig);
-
-            return enumerator;
-        }
-
-        /// <summary>
-        /// Removes the specified configuration
-        /// </summary>
-        /// <param name="dataConfig">Subscription config to be removed</param>
-        public void Unsubscribe(SubscriptionDataConfig dataConfig)
-        {
-            _subscriptionManager.Unsubscribe(dataConfig);
-            _aggregator.Remove(dataConfig);
-        }
-
-        /// <summary>
-        /// Sets the job we're subscribing for
-        /// </summary>
-        /// <param name="job">Job we're subscribing for</param>
-        public void SetJob(LiveNodePacket job)
-        {
-            throw new NotImplementedException();
-        }
-
-        #endregion
-
-        #region Brokerage
+        public override bool IsConnected => _isDataQueueHandlerInitialized && tdClient.LiveMarketDataStreamer.IsConnected;
 
         /// <summary>
         /// Gets all open orders on the account.
-        /// NOTE: The order objects returned do not have QC order IDs.
         /// </summary>
         /// <returns>The open orders returned from IB</returns>
         public override List<Order> GetOpenOrders()
         {
-            throw new NotImplementedException();
+            var orders = new List<Order>();
+            var openOrders = tdClient.AccountsAndTradingApi.GetAllOrdersAsync(_accountId, OrderStrategyStatusType.QUEUED).Result;
+
+            foreach (var openOrder in openOrders)
+            {
+                var order = TDAmeritradeToLeanMapper.ConvertOrder(openOrder);
+                orders.Add(order);
+            }
+
+            return orders;
         }
 
         /// <summary>
@@ -117,7 +147,59 @@ namespace QuantConnect.TemplateBrokerage
         /// <returns>The current holdings from the account</returns>
         public override List<Holding> GetAccountHoldings()
         {
-            throw new NotImplementedException();
+            var holdings = GetPositions().Select(ConvertToHolding).Where(x => x.Quantity != 0).ToList();
+            var tickers = holdings.Select(x => TDAmeritradeToLeanMapper.GetBrokerageSymbol(x.Symbol)).ToList();
+
+            var quotes = GetQuotes(tickers);
+            foreach (var holding in holdings)
+            {
+                var ticker = TDAmeritradeToLeanMapper.GetBrokerageSymbol(holding.Symbol);
+
+                if (quotes.TryGetValue(ticker, out MarketQuote quote))
+                {
+                    holding.MarketPrice = quote.LastPrice;
+                }
+            }
+            return holdings;
+        }
+
+        private Dictionary<string, MarketQuote> GetQuotes(List<string> tickers)
+        {
+            return tdClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
+        }
+
+        private Holding ConvertToHolding(Position position)
+        {
+            var symbol = TDAmeritradeToLeanMapper.GetSymbolFrom(position.instrument);
+
+            var averagePrice = position.averagePrice;
+            if (symbol.SecurityType == SecurityType.Option)
+            {
+                var multiplier = _symbolPropertiesDatabase.GetSymbolProperties(
+                        symbol.ID.Market,
+                        symbol,
+                        symbol.SecurityType,
+                        _algorithm.Portfolio.CashBook.AccountCurrency)
+                    .ContractMultiplier;
+
+                averagePrice /= multiplier;
+            }
+
+            return new Holding
+            {
+                Symbol = symbol,
+                AveragePrice = averagePrice,
+                CurrencySymbol = "$",
+                MarketPrice = 0m, //--> GetAccountHoldings does a call to GetQuotes to fill this data in
+                Quantity = position.shortQuantity == 0 ? position.longQuantity : position.shortQuantity
+            };
+        }
+
+        private IEnumerable<AccountsAndTrading.Position> GetPositions()
+        {
+            var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+
+            return account.positions ?? Enumerable.Empty<AccountsAndTrading.Position>();
         }
 
         /// <summary>
@@ -126,7 +208,22 @@ namespace QuantConnect.TemplateBrokerage
         /// <returns>The current cash balance for each currency available for trading</returns>
         public override List<CashAmount> GetCashBalance()
         {
-            throw new NotImplementedException();
+            return new List<CashAmount>
+            {
+                new CashAmount(GetCurrentCashBalance(), Currencies.USD)
+            };
+        }
+
+        private decimal GetCurrentCashBalance()
+        {
+            var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+
+            if (account is CashAccount cashAccount)
+                return cashAccount.currentBalances.totalCash;
+            else if (account is MarginAccount marginAccount)
+                return marginAccount.currentBalances.cashBalance;
+            else
+                return 0;
         }
 
         /// <summary>
@@ -136,7 +233,24 @@ namespace QuantConnect.TemplateBrokerage
         /// <returns>True if the request for a new order has been placed, false otherwise</returns>
         public override bool PlaceOrder(Order order)
         {
-            throw new NotImplementedException();
+            try
+            {
+                Log.Trace($"{nameof(TDAmeritradeBrokerage)}.PlaceOrder(): {order}");
+
+                var holdingQuantity = _securityProvider.GetHoldingsQuantity(order.Symbol);
+
+                var orderStrategy = TDAmeritradeToLeanMapper.ConvertToOrderStrategy(order, holdingQuantity);
+
+                tdClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
+
+                return true;
+            }
+            catch(Exception ex)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "PlaceOrderError", ex.Message));
+
+                return false;
+            }
         }
 
         /// <summary>
@@ -146,7 +260,22 @@ namespace QuantConnect.TemplateBrokerage
         /// <returns>True if the request was made for the order to be updated, false otherwise</returns>
         public override bool UpdateOrder(Order order)
         {
-            throw new NotImplementedException();
+            Log.Trace($"{nameof(TDAmeritradeBrokerage)}.UpdateOrder(): {order}");
+
+            try
+            {
+                var replaceOrder = TDAmeritradeToLeanMapper.ConvertToOrderStrategy(order, order.Quantity);
+
+                tdClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "UpdateOrderError", ex.Message));
+
+                return false;
+            }
         }
 
         /// <summary>
@@ -156,7 +285,21 @@ namespace QuantConnect.TemplateBrokerage
         /// <returns>True if the request was made for the order to be canceled, false otherwise</returns>
         public override bool CancelOrder(Order order)
         {
-            throw new NotImplementedException();
+            Log.Trace($"{nameof(TDAmeritradeBrokerage)}.CancelOrder(): {order}");
+
+            try
+            {
+
+                tdClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "CancelOrderError", ex.Message));
+
+                return false;
+            }
         }
 
         /// <summary>
@@ -164,7 +307,7 @@ namespace QuantConnect.TemplateBrokerage
         /// </summary>
         public override void Connect()
         {
-            throw new NotImplementedException();
+            tdClient.LiveMarketDataStreamer.LoginAsync(_accountId).Wait();
         }
 
         /// <summary>
@@ -172,64 +315,36 @@ namespace QuantConnect.TemplateBrokerage
         /// </summary>
         public override void Disconnect()
         {
-            throw new NotImplementedException();
-        }
-
-        #endregion
-
-        #region IDataQueueUniverseProvider
-
-        /// <summary>
-        /// Method returns a collection of Symbols that are available at the data source.
-        /// </summary>
-        /// <param name="symbol">Symbol to lookup</param>
-        /// <param name="includeExpired">Include expired contracts</param>
-        /// <param name="securityCurrency">Expected security currency(if any)</param>
-        /// <returns>Enumerable of Symbols, that are associated with the provided Symbol</returns>
-        public IEnumerable<Symbol> LookupSymbols(Symbol symbol, bool includeExpired, string securityCurrency = null)
-        {
-            throw new NotImplementedException();
+            tdClient.LiveMarketDataStreamer.LogoutAsync().Wait();
         }
 
         /// <summary>
-        /// Returns whether selection can take place or not.
+        /// Dispose of the brokerage instance
         /// </summary>
-        /// <remarks>This is useful to avoid a selection taking place during invalid times, for example IB reset times or when not connected,
-        /// because if allowed selection would fail since IB isn't running and would kill the algorithm</remarks>
-        /// <returns>True if selection can take place</returns>
-        public bool CanPerformSelection()
+        public override void Dispose()
         {
-            throw new NotImplementedException();
+            _orderFillTimer.DisposeSafely();
         }
 
-        #endregion
-
-        private bool CanSubscribe(Symbol symbol)
+        private readonly HashSet<string> ErrorsDuringMarketHours = new HashSet<string>
         {
-            if (symbol.Value.IndexOfInvariant("universe", true) != -1)
+            "CheckForFillsError", "UnknownIdResolution", "ContingentOrderError", "NullResponse", "PendingOrderNotReturned"
+        };
+
+        /// <summary>
+        /// Event invocator for the Message event
+        /// </summary>
+        /// <param name="e">The error</param>
+        protected override void OnMessage(BrokerageMessageEvent e)
+        {
+            var message = e;
+            if (Exchange.DateTimeIsOpen(DateTime.Now) && ErrorsDuringMarketHours.Contains(e.Code))
             {
-                return false;
+                // elevate this to an error
+                message = new BrokerageMessageEvent(BrokerageMessageType.Error, e.Code, e.Message);
             }
-
-            throw new NotImplementedException();
+            base.OnMessage(message);
         }
-
-        /// <summary>
-        /// Adds the specified symbols to the subscription
-        /// </summary>
-        /// <param name="symbols">The symbols to be added keyed by SecurityType</param>
-        private bool Subscribe(IEnumerable<Symbol> symbols)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Removes the specified symbols to the subscription
-        /// </summary>
-        /// <param name="symbols">The symbols to be removed keyed by SecurityType</param>
-        private bool Unsubscribe(IEnumerable<Symbol> symbols)
-        {
-            throw new NotImplementedException();
-        }
+        #endregion
     }
 }

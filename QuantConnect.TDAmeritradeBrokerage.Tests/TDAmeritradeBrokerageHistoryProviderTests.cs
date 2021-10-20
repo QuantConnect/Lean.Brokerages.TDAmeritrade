@@ -21,8 +21,13 @@ using QuantConnect.Logging;
 using QuantConnect.Securities;
 using QuantConnect.Data.Market;
 using QuantConnect.Lean.Engine.HistoricalData;
+using QuantConnect.Brokerages.TDAmeritrade;
+using System.Collections.Generic;
+using QuantConnect.Configuration;
+using QuantConnect.Util;
+using TDAmeritradeApi.Client;
 
-namespace QuantConnect.TemplateBrokerage.Tests
+namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
     [TestFixture, Ignore("Not implemented")]
     public class TDAmeritradeBrokerageHistoryProviderTests
@@ -50,7 +55,12 @@ namespace QuantConnect.TemplateBrokerage.Tests
         {
             TestDelegate test = () =>
             {
-                var brokerage = new TDAmeritradeBrokerage(null);
+                var accountId = Config.Get("td-account-id");
+                var clientId = Config.Get("td-client-id");
+                var redirectUri = Config.Get("td-redirect-uri");
+                var tdCredentials = Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get("td-credentials-provider", "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider"));
+
+                var brokerage = new TDAmeritradeBrokerage(null, null, null, null, accountId, clientId, redirectUri, tdCredentials);
 
                 var historyProvider = new BrokerageHistoryProvider();
                 historyProvider.SetBrokerage(brokerage);

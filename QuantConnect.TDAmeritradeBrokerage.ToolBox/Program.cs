@@ -13,14 +13,37 @@
  * limitations under the License.
 */
 
-namespace QuantConnect.TemplateBrokerage.ToolBox
+using QuantConnect.Brokerages.TDAmeritrade;
+using QuantConnect.Configuration;
+using QuantConnect.Data;
+using QuantConnect.Logging;
+using QuantConnect.Util;
+using System;
+using System.Collections.Generic;
+
+namespace QuantConnect.TDAmeritradeDownloader.ToolBox
 {
     static class Program
     {
         static void Main(string[] args)
         {
-            var downloader = new TDAmeritradeBrokerageDownloader();
+            var optionsObject = ToolboxArgumentParser.ParseArguments(args);
 
+            if (optionsObject.Count == 0)
+            {
+                ApplicationParser.PrintMessageAndExit();
+            }
+
+            var fromDate = Parse.DateTimeExact(ApplicationParser.GetParameterOrExit(optionsObject, "from-date"), "yyyyMMdd-HH:mm:ss");
+            var resolution = optionsObject.ContainsKey("resolution") ? optionsObject["resolution"].ToString() : "";
+            var market = optionsObject.ContainsKey("market") ? optionsObject["market"].ToString() : "";
+            var securityType = optionsObject.ContainsKey("security-type") ? optionsObject["security-type"].ToString() : "";
+            var tickers = ToolboxArgumentParser.GetTickers(optionsObject);
+            var toDate = optionsObject.ContainsKey("to-date")
+                ? Parse.DateTimeExact(optionsObject["to-date"].ToString(), "yyyyMMdd-HH:mm:ss")
+                : DateTime.UtcNow;
+
+            TDAmeritradeDownloaderProgram.TDAmeritradeDownloader(tickers, resolution, fromDate, toDate, securityType);
         }
     }
 }

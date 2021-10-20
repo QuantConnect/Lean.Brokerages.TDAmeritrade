@@ -25,8 +25,8 @@ using System.Collections.Generic;
 
 namespace QuantConnect.TemplateBrokerage
 {
-    [BrokerageFactory(typeof(TemplateBrokerageFactory))]
-    public class TemplateBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
+    [BrokerageFactory(typeof(TDAmeritradeBrokerageFactory))]
+    public class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
     {
         private readonly IDataAggregator _aggregator;
         private readonly EventBasedDataQueueHandlerSubscriptionManager _subscriptionManager;
@@ -40,7 +40,7 @@ namespace QuantConnect.TemplateBrokerage
          /// Creates a new instance
          /// </summary>
         /// <param name="aggregator">consolidate ticks</param>
-        public TemplateBrokerage(IDataAggregator aggregator) : base("TemplateBrokerage")
+        public TDAmeritradeBrokerage(IDataAggregator aggregator) : base("TemplateBrokerage")
         {
             _aggregator = aggregator;
             _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();

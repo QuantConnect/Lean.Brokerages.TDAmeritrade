@@ -13,14 +13,12 @@
  * limitations under the License.
 */
 
-namespace QuantConnect.TemplateBrokerage.ToolBox
-{
-    static class Program
-    {
-        static void Main(string[] args)
-        {
-            var downloader = new TemplateBrokerageDownloader();
+using NUnit.Framework;
 
-        }
+namespace QuantConnect.TemplateBrokerage.Tests
+{
+    [TestFixture, Ignore("Not implemented")]
+    public class TDAmeritradeBrokerageAdditionalTests
+    {
     }
 }

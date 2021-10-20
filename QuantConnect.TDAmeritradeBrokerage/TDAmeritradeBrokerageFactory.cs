@@ -25,7 +25,7 @@ namespace QuantConnect.TemplateBrokerage
     /// <summary>
     /// Provides a template implementation of BrokerageFactory
     /// </summary>
-    public class TemplateBrokerageFactory : BrokerageFactory
+    public class TDAmeritradeBrokerageFactory : BrokerageFactory
     {
         /// <summary>
         /// Gets the brokerage data required to run the brokerage from configuration/disk
@@ -36,7 +36,7 @@ namespace QuantConnect.TemplateBrokerage
         /// </remarks>
         public override Dictionary<string, string> BrokerageData { get; }
 
-        public TemplateBrokerageFactory(Type brokerageType) : base(brokerageType)
+        public TDAmeritradeBrokerageFactory(Type brokerageType) : base(brokerageType)
         {
         }
 

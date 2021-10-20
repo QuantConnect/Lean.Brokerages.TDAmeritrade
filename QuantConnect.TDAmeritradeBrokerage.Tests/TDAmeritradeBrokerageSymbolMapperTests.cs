@@ -18,7 +18,7 @@ using NUnit.Framework;
 namespace QuantConnect.TemplateBrokerage.Tests
 {
     [TestFixture, Ignore("Not implemented")]
-    public class TemplateBrokerageSymbolMapperTests
+    public class TDAmeritradeBrokerageSymbolMapperTests
     {
         [Test]
         public void ReturnsCorrectLeanSymbol()

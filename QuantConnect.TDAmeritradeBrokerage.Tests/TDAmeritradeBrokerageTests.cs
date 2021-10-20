@@ -22,7 +22,7 @@ using QuantConnect.Tests.Brokerages;
 namespace QuantConnect.TemplateBrokerage.Tests
 {
     [TestFixture, Ignore("Not implemented")]
-    public partial class TemplateBrokerageTests : BrokerageTests
+    public partial class TDAmeritradeBrokerageTests : BrokerageTests
     {
         protected override Symbol Symbol { get; }
         protected override SecurityType SecurityType { get; }

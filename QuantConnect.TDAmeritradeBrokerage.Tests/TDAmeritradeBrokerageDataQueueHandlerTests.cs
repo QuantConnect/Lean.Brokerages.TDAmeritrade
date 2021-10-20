@@ -23,7 +23,7 @@ using QuantConnect.Data.Market;
 namespace QuantConnect.TemplateBrokerage.Tests
 {
     [TestFixture]
-    public partial class TemplateBrokerageTests
+    public partial class TDAmeritradeBrokerageTests
     {
         private static TestCaseData[] TestParameters
         {
@@ -43,7 +43,7 @@ namespace QuantConnect.TemplateBrokerage.Tests
         public void StreamsData(Symbol symbol, Resolution resolution, bool throwsException)
         {
             var cancelationToken = new CancellationTokenSource();
-            var brokerage = (TemplateBrokerage)Brokerage;
+            var brokerage = (TDAmeritradeBrokerage)Brokerage;
 
             SubscriptionDataConfig[] configs;
             if (resolution == Resolution.Tick)

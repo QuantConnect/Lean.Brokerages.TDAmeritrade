@@ -22,7 +22,7 @@ namespace QuantConnect.TemplateBrokerage.ToolBox
     /// <summary>
     /// Template Brokerage Data Downloader implementation
     /// </summary>
-    public class TemplateBrokerageDownloader : IDataDownloader
+    public class TDAmeritradeBrokerageDownloader : IDataDownloader
     {
         /// <summary>
         /// Get historical data enumerable for a single symbol, type and resolution given this start and end time (in UTC).

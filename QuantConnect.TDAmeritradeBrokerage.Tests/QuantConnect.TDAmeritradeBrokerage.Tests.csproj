@@ -28,7 +28,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Lean\Tests\QuantConnect.Tests.csproj" />
-      <ProjectReference Include="..\QuantConnect.TemplateBrokerage\QuantConnect.TemplateBrokerage.csproj" />
+      <ProjectReference Include="..\QuantConnect.TDAmeritradeBrokerage\QuantConnect.TDAmeritradeBrokerage.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -25,7 +25,7 @@ using QuantConnect.Lean.Engine.HistoricalData;
 namespace QuantConnect.TemplateBrokerage.Tests
 {
     [TestFixture, Ignore("Not implemented")]
-    public class TemplateBrokerageHistoryProviderTests
+    public class TDAmeritradeBrokerageHistoryProviderTests
     {
         private static TestCaseData[] TestParameters
         {
@@ -50,7 +50,7 @@ namespace QuantConnect.TemplateBrokerage.Tests
         {
             TestDelegate test = () =>
             {
-                var brokerage = new TemplateBrokerage(null);
+                var brokerage = new TDAmeritradeBrokerage(null);
 
                 var historyProvider = new BrokerageHistoryProvider();
                 historyProvider.SetBrokerage(brokerage);

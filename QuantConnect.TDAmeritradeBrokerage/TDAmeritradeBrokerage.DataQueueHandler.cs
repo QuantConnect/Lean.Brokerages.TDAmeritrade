@@ -33,7 +33,7 @@ using TDAmeritradeApi.Client.Models.Streamer;
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
     /// <summary>
-    /// Tradier Class: IDataQueueHandler implementation
+    /// TDAmeritradeBrokerage Class: IDataQueueHandler implementation
     /// </summary>
     public partial class TDAmeritradeBrokerage : IDataQueueHandler
     {
@@ -72,6 +72,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return enumerator;
         }
 
+        /// <summary>
+        /// Check if we can subscribe to symbol
+        /// </summary>
+        /// <param name="symbol">symbol to subscribe to</param>
+        /// <returns>true if we can subscribe false otherwise</returns>
         private static bool CanSubscribe(Symbol symbol)
         {
             return TDAmeritradeBrokerageModel.DefaultMarketMap.ContainsKey(symbol.ID.SecurityType) && !symbol.Value.Contains("universe", StringComparison.InvariantCultureIgnoreCase);
@@ -87,6 +92,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _aggregator.Remove(dataConfig);
         }
 
+        /// <summary>
+        /// Subscribe to symbols
+        /// </summary>
+        /// <param name="symbols">symbols to subscribe to</param>
+        /// <param name="tickType">unused</param>
+        /// <returns>if subscription was a success</returns>
         private bool Subscribe(IEnumerable<Symbol> symbols, TickType tickType)
         {
             var symbolsAdded = false;
@@ -112,6 +123,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return true;
         }
 
+        /// <summary>
+        /// Unsubscribe to symbols
+        /// </summary>
+        /// <param name="symbols">symbols to unsubscribe to</param>
+        /// <param name="tickType">unused</param>
+        /// <returns>if unsubscription was a success</returns>
         private bool Unsubscribe(IEnumerable<Symbol> symbols, TickType tickType)
         {
             var symbolsRemoved = false;
@@ -145,6 +162,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return true;
         }
 
+        /// <summary>
+        /// Performs the actual subscription through the brokerage
+        /// </summary>
+        /// <param name="brokerageSymbolToLeanSymbolsSubscribeList">brokerage symbol to LEAN symbol object lookup</param>
         private void SubscribeTo(List<KeyValuePair<string, Symbol>> brokerageSymbolToLeanSymbolsSubscribeList)
         {
             foreach (var brokerageSymbolToLeanSymbolToSubscribe in brokerageSymbolToLeanSymbolsSubscribeList)
@@ -180,6 +201,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Received New data received notification
+        /// </summary>
+        /// <param name="_">unused</param>
+        /// <param name="e">new data for <see cref="MarketDataType"/></param>
         private void OnMarketDateReceived(object _, TDAmeritradeApi.Client.Models.Streamer.MarketDataType e)
         {
             if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes)
@@ -210,6 +236,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Adds tick data to aggregator
+        /// </summary>
+        /// <param name="data">data from td ameritrade api</param>
         private void AddTickData(StoredData data)
         {
             ConcurrentQueue<LevelOneQuote> queue = data.Data;
@@ -247,6 +277,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Get's the options open interest
+        /// </summary>
+        /// <param name="optionQuote">option quote data</param>
+        /// <returns>open interest information for LEAN</returns>
         private OpenInterest GetOpenInterest(OptionLevelOneQuote optionQuote)
         {
             Symbol symbol;
@@ -256,7 +291,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return null;
             }
 
-            // Tradier trades are US NY time only. Convert local server time to NY Time:
+            // TDAmeritradeBrokerage trades are US NY time only. Convert local server time to NY Time:
             var utc = optionQuote.QuoteTime;
 
             // Convert the timestamp to exchange timezone and pass into algorithm
@@ -279,7 +314,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return null;
             }
 
-            // Tradier trades are US NY time only. Convert local server time to NY Time:
+            // TDAmeritradeBrokerage trades are US NY time only. Convert local server time to NY Time:
             var utc = marketQuote.QuoteTime;
 
             // Convert the timestamp to exchange timezone and pass into algorithm
@@ -302,7 +337,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return null;
             }
 
-            // Tradier trades are US NY time only. Convert local server time to NY Time:
+            // TDAmeritradeBrokerage trades are US NY time only. Convert local server time to NY Time:
             var utc = marketQuote.TradeTime;
 
             // Convert the timestamp to exchange timezone and pass into algorithm

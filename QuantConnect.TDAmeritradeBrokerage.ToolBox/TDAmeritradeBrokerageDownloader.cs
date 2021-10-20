@@ -24,8 +24,14 @@ using TDAmeritradeApi.Client;
 
 namespace QuantConnect.TDAmeritradeDownloader.ToolBox
 {
+    /// <summary>
+    /// Pulls data from TD Ameritrade Brokerage
+    /// </summary>
     public class TDAmeritradeBrokerageDownloader : IDataDownloader
     {
+        /// <summary>
+        /// Initialize <see cref="TDAmeritradeBrokerageDownloader"/>
+        /// </summary>
         public TDAmeritradeBrokerageDownloader()
         {
             var clientID = Config.Get("td-client-id", "");
@@ -34,6 +40,14 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
             TDAmeritradeBrokerage.InitializeClient(clientID, redirectUri, tdCredentials);
         }
 
+        /// <summary>
+        /// Get historical data enumerable for a single symbol, type and resolution given this start and end time (in UTC).
+        /// </summary>
+        /// <param name="symbol">Symbol for the data we're looking for.</param>
+        /// <param name="resolution">Resolution of the data request</param>
+        /// <param name="startUtc">Start time of the data in UTC</param>
+        /// <param name="endUtc">End time of the data in UTC</param>
+        /// <returns>Enumerable of base data for this symbol</returns>
         public IEnumerable<BaseData> Get(Symbol symbol, Resolution resolution, DateTime startUtc, DateTime endUtc)
         {
             return TDAmeritradeBrokerage.GetPriceHistory(symbol, resolution, startUtc, endUtc, TimeZones.NewYork);

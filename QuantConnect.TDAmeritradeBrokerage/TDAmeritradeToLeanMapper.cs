@@ -31,6 +31,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         private static readonly TDAmeritradeSymbolMapper _symbolMapper = new TDAmeritradeSymbolMapper();
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="instrument">symbol information</param>
+        /// <returns>LEAN Object</returns>
         public static Symbol GetSymbolFrom(Instrument instrument)
         {
             var securityType = GetSecurityType(instrument.assetType);
@@ -48,13 +53,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return _symbolMapper.GetBrokerageSymbol(symbol);
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="symbol">ticker symbol</param>
+        /// <param name="securityType">market where symbol belongs</param>
+        /// <returns>LEAN Object</returns>
         internal static Symbol GetLeanSymbol(string symbol, SecurityType securityType)
         {
             return _symbolMapper.GetLeanSymbol(symbol, securityType, Market.USA);
         }
 
         /// <summary>
-        /// Converts the specified tradier order into a qc order.
+        /// Converts the specified TD Ameritrade order into a qc order.
         /// The 'task' will have a value if we needed to issue a rest call for the stop price, otherwise it will be null
         /// </summary>
         public static Order ConvertOrder(OrderStrategy orderStrategy)
@@ -107,6 +118,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return qcOrder;
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="duration">amount of time order is valid</param>
+        /// <returns>LEAN <see cref="TimeInForce"/></returns>
         private static TimeInForce ConvertTimeInForce(OrderDurationType duration)
         {
             switch (duration)
@@ -120,6 +136,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="status">order status</param>
+        /// <returns>LEAN <see cref="OrderStatus"/></returns>
         private static OrderStatus ConvertStatus(OrderStrategyStatusType status)
         {
             switch (status)
@@ -152,6 +173,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="assetType">the security's type</param>
+        /// <returns>LEAN <see cref="SecurityType"/></returns>
         private static SecurityType GetSecurityType(InstrumentAssetType assetType)
         {
             switch (assetType)
@@ -168,6 +194,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="order">order details</param>
+        /// <param name="holdingQuantity">amount you are holding</param>
+        /// <returns>LEAN <see cref="OrderStrategy"/></returns>
         public static OrderStrategy ConvertToOrderStrategy(Order order, decimal holdingQuantity)
         {
             var instrumentAssetType = GetInstrumentAssetType(order.SecurityType);
@@ -212,6 +244,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
         }
 
+        /// <summary>
+        /// Convert TD Ameritrade API object to LEAN Object
+        /// </summary>
+        /// <param name="instrumentAssetType">the security's type</param>
+        /// <returns>LEAN <see cref="OrderInstructionType"/></returns>
         private static OrderInstructionType GetOrderInstruction(InstrumentAssetType instrumentAssetType, Order order, decimal holdingQuantity)
         {
             if (instrumentAssetType == InstrumentAssetType.OPTION)
@@ -251,6 +288,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Convert LEAN Object to TD Ameritrade API object
+        /// </summary>
+        /// <param name="securityType">the security's type</param>
+        /// <returns>TD Ameritrade API <see cref="InstrumentAssetType"/></returns>
         private static InstrumentAssetType GetInstrumentAssetType(SecurityType securityType)
         {
             switch (securityType)
@@ -267,6 +309,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        /// <summary>
+        /// Convert LEAN Object to TD Ameritrade API object
+        /// </summary>
+        /// <param name="order">order details</param>
+        /// <returns>TD Ameritrade API <see cref="OrderStrategyType"/></returns>
         private static OrderStrategyType GetStrategyType(Order order)
         {
             if (order is StopLimitOrder stopLimitOrder)
@@ -278,6 +325,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return OrderStrategyType.SINGLE;
         }
 
+        /// <summary>
+        /// Convert LEAN Object to TD Ameritrade API object
+        /// </summary>
+        /// <param name="timeInForce">length of time order is good for</param>
+        /// <returns>TD Ameritrade API <see cref="OrderDurationType"/></returns>
         private static OrderDurationType GetDuration(TimeInForce timeInForce)
         {
             if (timeInForce is DayTimeInForce)
@@ -286,6 +338,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return OrderDurationType.GOOD_TILL_CANCEL;
         }
 
+        /// <summary>
+        /// Convert LEAN Object to TD Ameritrade API object
+        /// </summary>
+        /// <param name="type">order type</param>
+        /// <returns>TD Ameritrade API <see cref="AccountsAndTrading.OrderType"/></returns>
         private static AccountsAndTrading.OrderType GetOrderType(Orders.OrderType type)
         {
             switch (type)

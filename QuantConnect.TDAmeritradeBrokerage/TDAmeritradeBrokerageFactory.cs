@@ -33,7 +33,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly List<TDAmeritradeBrokerage> instances = new List<TDAmeritradeBrokerage>();
 
         /// <summary>
-        /// Gets tradier values from configuration
+        /// Gets TD Ameritrade values from configuration
         /// </summary>
         public static class Configuration
         {

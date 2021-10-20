@@ -22,8 +22,15 @@ using TDAmeritradeApi.Client;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
+    /// <summary>
+    /// TD Ameritrade API credential provider for inputting information by the command line.
+    /// </summary>
     public class TDCliCredentialProvider : ICredentials
     {
+        /// <summary>
+        /// Callback method for getting the password from the command line.
+        /// </summary>
+        /// <returns>password</returns>
         public string GetPassword()
         {
             Console.WriteLine("Password: ");
@@ -31,6 +38,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return Console.ReadLine();
         }
 
+        /// <summary>
+        /// Callback method for getting the multi-factor authorization code from the command line.
+        /// </summary>
+        /// <returns>code</returns>
         public string GetSmsCode()
         {
             Console.WriteLine("Sms code: ");
@@ -38,6 +49,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return Console.ReadLine();
         }
 
+        /// <summary>
+        /// Callback method for getting the username from the command line.
+        /// </summary>
+        /// <returns>username</returns>
         public string GetUserName()
         {
             Console.WriteLine("Username: ");

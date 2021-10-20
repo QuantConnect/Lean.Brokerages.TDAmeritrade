@@ -42,7 +42,7 @@ using AccountsAndTrading = TDAmeritradeApi.Client.Models.AccountsAndTrading;
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
     /// <summary>
-    /// Tradier Class:
+    /// TDAmeritradeBrokerage Class:
     ///  - Handle authentication.
     ///  - Data requests.
     ///  - Rate limiting.
@@ -79,7 +79,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public override string AccountBaseCurrency => Currencies.USD;
 
         /// <summary>
-        /// Create a new Tradier Object:
+        /// Create a new TDAmeritradeBrokerage Object:
         /// </summary>
         public TDAmeritradeBrokerage(
             IAlgorithm algorithm,
@@ -107,6 +107,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             InitializeClient(clientId, redirectUri, tdCredentials);
         }
 
+        /// <summary>
+        /// Initialize TDAmeritrade Api client.
+        /// All information can be acquired by creating a new app at https://developer.tdameritrade.com/user/me/apps
+        /// </summary>
+        /// <param name="clientId">This is the consumer key that is generated in MyApps</param>
+        /// <param name="redirectUri">This is the callback url that is defined in MyApps</param>
+        /// <param name="tdCredentials">Callback interface for supplying username, password, and multi-factor authorization code</param>
         public static void InitializeClient(string clientId, string redirectUri, ICredentials tdCredentials)
         {
             if (tdClient == null)
@@ -163,11 +170,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return holdings;
         }
 
+        /// <summary>
+        /// Get Quotes wrapper of api
+        /// </summary>
+        /// <param name="tickers">ticker symbols to get quotes of</param>
+        /// <returns>a dictionary mapping ticker symbol to quote</returns>
         private Dictionary<string, MarketQuote> GetQuotes(List<string> tickers)
         {
             return tdClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
         }
 
+        /// <summary>
+        /// Convert api position object to LEAN holding object
+        /// </summary>
+        /// <param name="position">trading position</param>
+        /// <returns>LEAN holding object</returns>
         private Holding ConvertToHolding(Position position)
         {
             var symbol = TDAmeritradeToLeanMapper.GetSymbolFrom(position.instrument);
@@ -195,6 +212,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
         }
 
+        /// <summary>
+        /// Gets current holdings from TD Ameritrade
+        /// </summary>
+        /// <returns>positions</returns>
         private IEnumerable<AccountsAndTrading.Position> GetPositions()
         {
             var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
@@ -214,6 +235,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
         }
 
+        /// <summary>
+        /// Get current cash balance from TD Ameritrade
+        /// </summary>
+        /// <returns>cash balance</returns>
         private decimal GetCurrentCashBalance()
         {
             var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;

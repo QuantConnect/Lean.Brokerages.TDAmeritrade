@@ -36,7 +36,7 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
 
             var fromDate = Parse.DateTimeExact(ApplicationParser.GetParameterOrExit(optionsObject, "from-date"), "yyyyMMdd-HH:mm:ss");
             var resolution = optionsObject.ContainsKey("resolution") ? optionsObject["resolution"].ToString() : "";
-            var market = optionsObject.ContainsKey("market") ? optionsObject["market"].ToString() : "";
+            //var market = optionsObject.ContainsKey("market") ? optionsObject["market"].ToString() : "";
             var securityType = optionsObject.ContainsKey("security-type") ? optionsObject["security-type"].ToString() : "";
             var tickers = ToolboxArgumentParser.GetTickers(optionsObject);
             var toDate = optionsObject.ContainsKey("to-date")

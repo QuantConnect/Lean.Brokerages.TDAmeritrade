@@ -24,14 +24,17 @@ using TDAmeritradeApi.Client.Models.MarketData;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
+    /// <summary>
+    /// TDAmeritrade Class: IOptionChainProvider implementation
+    /// </summary>
     public partial class TDAmeritradeBrokerage : IOptionChainProvider
     {
         /// <summary>
-        /// 
+        /// Gets the list of option contracts for a given underlying symbol
         /// </summary>
-        /// <param name="symbol"></param>
-        /// <param name="date"></param>
-        /// <returns></returns>
+        /// <param name="symbol">The underlying symbol</param>
+        /// <param name="date">The date for which to request the option chain (only used in backtesting)</param>
+        /// <returns>The list of option contracts</returns>
         public IEnumerable<Symbol> GetOptionContractList(Symbol symbol, DateTime date)
         {
             try
@@ -50,6 +53,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return Enumerable.Empty<Symbol>(); ;
         }
 
+        /// <returns></returns>
+        /// <summary>
+        /// Gets the list of option contracts for a given underlying symbol
+        /// </summary>
+        /// <param name="symbol">The underlying symbol</param>
+        /// <param name="optionChain">strike price to expiration lookup</param>
+        /// <param name="optionRight">call or put</param>
+        /// <returns>The list of option contracts</returns>
         private static List<Symbol> CreateSymbols(Symbol symbol, Dictionary<string, Dictionary<decimal, List<ExpirationDateMap>>> optionChain, OptionRight optionRight)
         {
             List<Symbol> options = new List<Symbol>();

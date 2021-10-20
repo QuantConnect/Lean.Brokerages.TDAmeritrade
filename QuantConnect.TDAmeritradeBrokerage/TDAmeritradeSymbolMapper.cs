@@ -36,12 +36,22 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 : symbol.Value;
         }
 
+        /// <summary>
+        /// Convert LEAN Symbol to brokerage option ticker
+        /// </summary>
+        /// <param name="symbol">LEAN symbol object <see cref="Symbol"/></param>
+        /// <returns>TD Ameritrade option ticker</returns>
         private static string GetOptionSymbol(Symbol symbol)
         {
             var optionSymbol = symbol.ID.OptionRight == OptionRight.Call ? "C" : "P";
             return $"{symbol.Underlying.Value}_{symbol.ID.Date.ToString("MMddyy", CultureInfo.InvariantCulture)}{optionSymbol}{symbol.ID.StrikePrice}";
         }
 
+        /// <summary>
+        /// Converts TD Ameritrade option ticker to LEAN option contract
+        /// </summary>
+        /// <param name="brokerageSymbol">TD Ameritrade option ticker</param>
+        /// <returns>LEAN Option contract <see cref="Symbol"/></returns>
         private Symbol GetOptionSymbolFromBrokerageSymbol(string brokerageSymbol)
         {
             var symbolAndInfo = brokerageSymbol.Split('_');

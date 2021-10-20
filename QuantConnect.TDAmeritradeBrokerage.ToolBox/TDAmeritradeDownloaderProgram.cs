@@ -26,8 +26,8 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
     public static class TDAmeritradeDownloaderProgram
     {
         /// <summary>
-        /// Kraken Downloader Toolbox Project For LEAN Algorithmic Trading Engine.
-        /// By @matthewsedam
+        /// TDAmeritrade Downloader Toolbox Project For LEAN Algorithmic Trading Engine.
+        /// By @bmello4688
         /// </summary>
         public static void TDAmeritradeDownloader(IList<string> tickers, string resolution, DateTime startDate, DateTime endDate, string securityType)
         {

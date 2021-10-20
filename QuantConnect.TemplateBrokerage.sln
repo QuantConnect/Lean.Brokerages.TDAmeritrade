@@ -1,0 +1,67 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31205.134
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage", "QuantConnect.TemplateBrokerage\QuantConnect.TemplateBrokerage.csproj", "{7C447DDD-D30D-46C3-A341-2D768CCEEC10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect", "..\Lean\Common\QuantConnect.csproj", "{477827EE-5908-48AB-B6A4-DAB6E85D96DF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Logging", "..\Lean\Logging\QuantConnect.Logging.csproj", "{86BE4507-719A-466A-B3E7-4840BBD1AAA8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Configuration", "..\Lean\Configuration\QuantConnect.Configuration.csproj", "{2FBFC99D-1404-49CD-86C5-2EFF9EDE78BC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Brokerages", "..\Lean\Brokerages\QuantConnect.Brokerages.csproj", "{764AE24F-232B-4D0D-8B04-DFE3A4907D38}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Tests", "..\Lean\Tests\QuantConnect.Tests.csproj", "{40B784EE-9297-4715-8C8F-829DFE858BEF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage.Tests", "QuantConnect.TemplateBrokerage.Tests\QuantConnect.TemplateBrokerage.Tests.csproj", "{8793CDDF-3348-473F-98AF-68C6EBFA5014}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage.ToolBox", "QuantConnect.TemplateBrokerage.ToolBox\QuantConnect.TemplateBrokerage.ToolBox.csproj", "{1AB073F2-6881-48C3-AC07-A042D0B51E6B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7C447DDD-D30D-46C3-A341-2D768CCEEC10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C447DDD-D30D-46C3-A341-2D768CCEEC10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C447DDD-D30D-46C3-A341-2D768CCEEC10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C447DDD-D30D-46C3-A341-2D768CCEEC10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{477827EE-5908-48AB-B6A4-DAB6E85D96DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{477827EE-5908-48AB-B6A4-DAB6E85D96DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{477827EE-5908-48AB-B6A4-DAB6E85D96DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{477827EE-5908-48AB-B6A4-DAB6E85D96DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86BE4507-719A-466A-B3E7-4840BBD1AAA8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86BE4507-719A-466A-B3E7-4840BBD1AAA8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86BE4507-719A-466A-B3E7-4840BBD1AAA8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86BE4507-719A-466A-B3E7-4840BBD1AAA8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FBFC99D-1404-49CD-86C5-2EFF9EDE78BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FBFC99D-1404-49CD-86C5-2EFF9EDE78BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FBFC99D-1404-49CD-86C5-2EFF9EDE78BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FBFC99D-1404-49CD-86C5-2EFF9EDE78BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{764AE24F-232B-4D0D-8B04-DFE3A4907D38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{764AE24F-232B-4D0D-8B04-DFE3A4907D38}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{764AE24F-232B-4D0D-8B04-DFE3A4907D38}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{764AE24F-232B-4D0D-8B04-DFE3A4907D38}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40B784EE-9297-4715-8C8F-829DFE858BEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40B784EE-9297-4715-8C8F-829DFE858BEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40B784EE-9297-4715-8C8F-829DFE858BEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40B784EE-9297-4715-8C8F-829DFE858BEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8793CDDF-3348-473F-98AF-68C6EBFA5014}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8793CDDF-3348-473F-98AF-68C6EBFA5014}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8793CDDF-3348-473F-98AF-68C6EBFA5014}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8793CDDF-3348-473F-98AF-68C6EBFA5014}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1AB073F2-6881-48C3-AC07-A042D0B51E6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AB073F2-6881-48C3-AC07-A042D0B51E6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AB073F2-6881-48C3-AC07-A042D0B51E6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AB073F2-6881-48C3-AC07-A042D0B51E6B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {61010DD6-6D0C-4324-8137-1EDF35F16864}
+	EndGlobalSection
+EndGlobal

@@ -19,16 +19,21 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NodaTime;
+using QuantConnect.Brokerages.Paper;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
+using QuantConnect.Logging;
+using QuantConnect.Orders;
 using QuantConnect.Packets;
 using RestSharp;
 using TDAmeritradeApi.Client.Models.MarketData;
 using TDAmeritradeApi.Client.Models.Streamer;
+using TDAmeritradeApi.Client.Models.Streamer.AccountActivityModels;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
@@ -39,8 +44,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         #region IDataQueueHandler implementation
 
-        private bool _isDataQueueHandlerInitialized;
-
         private readonly ConcurrentDictionary<string, Symbol> _subscribedTickers = new ConcurrentDictionary<string, Symbol>();
 
         /// <summary>
@@ -49,8 +52,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="job">Job we're subscribing for</param>
         public void SetJob(LiveNodePacket job)
         {
+            if (_paperTrade && _paperBrokerage is null)
+            {
+                _paperBrokerage = new(_algorithm, this, job);
+                _paperBrokerage.OrderStatusChanged += (sender, e) => OnOrderEvent(e);
+            }
+
             //set once
-            tdClient.LiveMarketDataStreamer.MarketData.DataReceived += OnMarketDateReceived;
+            _tdClient.LiveMarketDataStreamer.MarketData.DataReceived += OnMarketDateReceived;
         }
 
         /// <summary>
@@ -156,7 +165,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (symbolsRemoved)
             {
-                tdClient.LiveMarketDataStreamer.UnsubscribeAsync(TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes, symbolsToRemove.ToArray()).Wait();
+                _tdClient.LiveMarketDataStreamer.UnsubscribeAsync(TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes, symbolsToRemove.ToArray()).Wait();
             }
 
             return true;
@@ -180,20 +189,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     case SecurityType.Index:
                     case SecurityType.Equity:
-                        tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Equity, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Equity, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.IndexOption:
                     case SecurityType.Option:
-                        tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Option, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Option, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.Forex:
-                        tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Forex, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Forex, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.Future:
-                        tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Futures, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Futures, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.FutureOption:
-                        tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                         //default:
                         //    break;
@@ -210,7 +219,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes)
             {
-                var dataDictionary = tdClient.LiveMarketDataStreamer.MarketData[e].ToList()
+                var dataDictionary = _tdClient.LiveMarketDataStreamer.MarketData[e]
                     .OrderBy(kvp =>
                     {
                         var item = kvp.Value.IndividualItemType;
@@ -232,6 +241,40 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var data = item.Value;
 
                     AddTickData(data);
+                }
+
+                if (IsPaperTrading)
+                {
+                    _paperBrokerage.TryAndFillOrders();
+                }
+            }
+            else if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.AccountActivity)
+            {
+                var dataDictionary = _tdClient.LiveMarketDataStreamer.MarketData[e];
+
+                if (dataDictionary.ContainsKey(_accountId))
+                {
+                    if (dataDictionary[_accountId].Data is AccountActivity accountActivity)
+                    {
+                        if (accountActivity.Data is OrderMessage orderMessage)
+                        {
+                            var tdOrder = orderMessage.Order;
+
+                            if (int.TryParse(tdOrder.OrderKey, out int orderID))
+                            {
+                                var order = _orderProvider.GetOrderById(orderID);
+
+                                OrderEvent orderEvent = new OrderEvent(order, orderMessage.ActivityTimestamp, TDAmeritradeToLeanMapper.ConvertToOrderFee(tdOrder.Charges, AccountBaseCurrency));
+
+                                //Set extra information
+                                TDAmeritradeToLeanMapper.UpdateEventBasedOnMessage(orderEvent, orderMessage);
+
+                                OnOrderEvent(orderEvent);
+                            }
+                            else
+                                Log.Error($"Could not parse returned TDA Order ID {tdOrder.OrderKey}");
+                        }
+                    }
                 }
             }
         }
@@ -265,7 +308,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     }
                 }
 
-                if( quote is OptionLevelOneQuote optionQuote)
+                if (quote is OptionLevelOneQuote optionQuote)
                 {
                     var openInterest = GetOpenInterest(optionQuote);
 

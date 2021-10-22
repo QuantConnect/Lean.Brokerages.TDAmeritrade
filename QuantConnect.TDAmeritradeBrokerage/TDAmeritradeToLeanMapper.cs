@@ -18,11 +18,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using QuantConnect.Interfaces;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.TimeInForces;
+using QuantConnect.Securities;
 using TDAmeritradeApi.Client.Models;
 using TDAmeritradeApi.Client.Models.AccountsAndTrading;
 using TDAmeritradeApi.Client.Models.MarketData;
+using TDAmeritradeApi.Client.Models.Streamer.AccountActivityModels;
 using AccountsAndTrading = TDAmeritradeApi.Client.Models.AccountsAndTrading;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
@@ -68,54 +72,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// Converts the specified TD Ameritrade order into a qc order.
         /// The 'task' will have a value if we needed to issue a rest call for the stop price, otherwise it will be null
         /// </summary>
-        public static Order ConvertOrder(OrderStrategy orderStrategy)
+        public static Orders.Order ConvertOrder(OrderStrategy orderStrategy)
         {
-            var orderLeg = orderStrategy.orderLegCollection[0];
-            var symbol = GetSymbolFrom(orderLeg.instrument);
+            TDAmeritradeSubmitOrderRequest submitOrderRequest = new TDAmeritradeSubmitOrderRequest(orderStrategy);
 
-            var quantity = orderLeg.quantity;
+            var order = Orders.Order.CreateOrder(submitOrderRequest);
 
-            var time = orderStrategy.enteredTime.Value;
+            order.Status = ConvertStatus(orderStrategy.status.Value);
 
-            Order qcOrder;
-            switch (orderStrategy.orderType)
-            {
-                case AccountsAndTrading.OrderType.LIMIT:
-                    qcOrder = new LimitOrder(symbol, quantity, orderStrategy.price, time);
-                    break;
-                case AccountsAndTrading.OrderType.MARKET:
-                    qcOrder = new MarketOrder(symbol, quantity, time);
-                    break;
-                case AccountsAndTrading.OrderType.MARKET_ON_CLOSE:
-                    qcOrder = new MarketOnCloseOrder(symbol, quantity, time);
-                    break;
-                case AccountsAndTrading.OrderType.STOP:
-                    qcOrder = new StopMarketOrder(symbol, quantity, orderStrategy.stopPrice.Value, time);
-                    break;
-                case AccountsAndTrading.OrderType.STOP_LIMIT:
-                    qcOrder = new StopLimitOrder(symbol, quantity, orderStrategy.stopPrice.Value, orderStrategy.price, time);
-                    break;
-                //case AccountsAndTrading.OrderType.TRAILING_STOP:
-                //    qcOrder = new TrailingStopOrder { LimitPrice = orderStrategy.price, StopPrice = orderStrategy.stopPrice.Value };
-                //    break;
-                //case AccountsAndTrading.OrderType.TRAILING_STOP_LIMIT:
-                //    qcOrder = new TrailingStopLimitOrder { LimitPrice = orderStrategy.price, StopPrice = orderStrategy.stopPrice.Value };
-                //    break;
-                //case AccountsAndTrading.OrderType.NET_CREDIT:
-                //case AccountsAndTrading.OrderType.NET_DEBIT:
-                //case AccountsAndTrading.OrderType.NET_ZERO:
-                case AccountsAndTrading.OrderType.EXERCISE:
-                    qcOrder = new OptionExerciseOrder();
-                    break;
-                default:
-                    throw new NotImplementedException($"The TD order type {orderStrategy.orderType} is not implemented.");
-            }
-            
-            qcOrder.Status = ConvertStatus(orderStrategy.status.Value);
-            qcOrder.BrokerId.Add(orderStrategy.orderId.ToStringInvariant());
-            qcOrder.Properties.TimeInForce = ConvertTimeInForce(orderStrategy.duration);
-            
-            return qcOrder;
+            return order;
         }
 
         /// <summary>
@@ -200,7 +165,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="order">order details</param>
         /// <param name="holdingQuantity">amount you are holding</param>
         /// <returns>LEAN <see cref="OrderStrategy"/></returns>
-        public static OrderStrategy ConvertToOrderStrategy(Order order, decimal holdingQuantity)
+        public static OrderStrategy ConvertToOrderStrategy(Orders.Order order, decimal holdingQuantity)
         {
             var instrumentAssetType = GetInstrumentAssetType(order.SecurityType);
 
@@ -244,12 +209,83 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
         }
 
+        internal static void UpdateEventBasedOnMessage(OrderEvent orderEvent, OrderMessage orderMessage)
+        {
+            OrderStatus orderStatus;
+
+            if (orderMessage is BrokenTradeMessage)
+            {
+                orderStatus = OrderStatus.Canceled;
+            }
+            else if (orderMessage is UROUTMessage cancelMessage)
+            {
+                orderStatus = OrderStatus.Canceled;
+                orderEvent.FillQuantity = (decimal)cancelMessage.CancelledQuantity;
+            }
+            else if (orderMessage is OrderCancelRequestMessage cancelRequestMessage)
+            {
+                orderStatus = OrderStatus.CancelPending;
+                orderEvent.FillQuantity = (decimal)cancelRequestMessage.PendingCancelQuantity;
+            }
+            else if (orderMessage is ManualExecutionMessage)
+            {
+                orderStatus = OrderStatus.Filled;
+            }
+            else if (orderMessage is OrderActivationMessage orderActivationMessage)
+            {
+                orderStatus = OrderStatus.Submitted;
+                orderEvent.LimitPrice = (decimal)orderActivationMessage.ActivationPrice;
+            }
+            else if (orderMessage is OrderEntryRequestMessage)
+            {
+                orderStatus = OrderStatus.Submitted;
+            }
+            else if (orderMessage is OrderCancelReplaceRequestMessage orderCancelReplaceRequest)
+            {
+                orderStatus = OrderStatus.UpdateSubmitted;
+                orderEvent.FillQuantity = (decimal)orderCancelReplaceRequest.PendingCancelQuantity;
+                //orderEvent.UtcTime = orderCancelReplaceRequest.LastUpdated
+                //orderEvent.OrderId = orderCancelReplaceRequest.OriginalOrderId;
+            }
+            else if (orderMessage is OrderFillMessage)
+            {
+                orderStatus = OrderStatus.Filled;
+            }
+            else if (orderMessage is OrderPartialFillMessage partialFillMessage)
+            {
+                orderStatus = OrderStatus.PartiallyFilled;
+
+                orderEvent.FillQuantity = (decimal)partialFillMessage.RemainingQuantity;
+            }
+            else if (orderMessage is OrderRejectionMessage rejectionMessage)
+            {
+                orderStatus = OrderStatus.Invalid;
+
+                orderEvent.Message = $"Order Rejected: Code: {rejectionMessage.RejectCode} Reason: {rejectionMessage.RejectReason} Reported By {rejectionMessage.ReportedBy}";
+            }
+            else if (orderMessage is TooLateToCancelMessage)
+            {
+                orderStatus = OrderStatus.Invalid;
+            }
+            else
+                orderStatus = OrderStatus.None;
+
+            orderEvent.Status = orderStatus;
+        }
+
+        public static OrderFee ConvertToOrderFee(OrderCharge[] charges, string currency)
+        {
+            var amount = (decimal)charges.Sum(charge => charge.Amount);
+
+            return new OrderFee(new CashAmount(amount, currency));
+        }
+
         /// <summary>
         /// Convert TD Ameritrade API object to LEAN Object
         /// </summary>
         /// <param name="instrumentAssetType">the security's type</param>
         /// <returns>LEAN <see cref="OrderInstructionType"/></returns>
-        private static OrderInstructionType GetOrderInstruction(InstrumentAssetType instrumentAssetType, Order order, decimal holdingQuantity)
+        private static OrderInstructionType GetOrderInstruction(InstrumentAssetType instrumentAssetType, Orders.Order order, decimal holdingQuantity)
         {
             if (instrumentAssetType == InstrumentAssetType.OPTION)
             {
@@ -314,7 +350,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         /// <param name="order">order details</param>
         /// <returns>TD Ameritrade API <see cref="OrderStrategyType"/></returns>
-        private static OrderStrategyType GetStrategyType(Order order)
+        private static OrderStrategyType GetStrategyType(Orders.Order order)
         {
             if (order is StopLimitOrder stopLimitOrder)
             {
@@ -363,6 +399,69 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     return AccountsAndTrading.OrderType.EXERCISE;
                 default:
                     throw new NotSupportedException($"{type} is not supported.");
+            }
+        }
+
+        private class TDAmeritradeSubmitOrderRequest : SubmitOrderRequest
+        {
+            private OrderStrategy _orderStrategy;
+
+            public TDAmeritradeSubmitOrderRequest(OrderStrategy orderStrategy)
+                :base(GetOrderType(orderStrategy), 
+                     GetSecurityType(orderStrategy.orderLegCollection[0].instrument.assetType), 
+                     GetSymbolFrom(orderStrategy.orderLegCollection[0].instrument),
+                     orderStrategy.orderLegCollection[0].quantity,
+                     orderStrategy.stopPrice.GetValueOrDefault(),
+                     orderStrategy.price,
+                     orderStrategy.enteredTime.GetValueOrDefault(),
+                     "")
+            {
+                _orderStrategy = orderStrategy;
+                if (orderStrategy.orderId.HasValue)
+                {
+                    OrderId = (int)orderStrategy.orderId.Value;
+                }
+
+                OrderProperties.TimeInForce = ConvertTimeInForce(orderStrategy.duration);
+            }
+
+            private static Orders.OrderType GetOrderType(OrderStrategy orderStrategy)
+            {
+                Orders.OrderType orderType;
+                switch (orderStrategy.orderType)
+                {
+                    case AccountsAndTrading.OrderType.LIMIT:
+                        orderType = Orders.OrderType.Limit;
+                        break;
+                    case AccountsAndTrading.OrderType.MARKET:
+                        orderType = Orders.OrderType.Market;
+                        break;
+                    case AccountsAndTrading.OrderType.MARKET_ON_CLOSE:
+                        orderType = Orders.OrderType.MarketOnClose;
+                        break;
+                    case AccountsAndTrading.OrderType.STOP:
+                        orderType = Orders.OrderType.StopMarket;
+                        break;
+                    case AccountsAndTrading.OrderType.STOP_LIMIT:
+                        orderType = Orders.OrderType.StopLimit;
+                        break;
+                    //case AccountsAndTrading.OrderType.TRAILING_STOP:
+                    //    qcOrder = new TrailingStopOrder { LimitPrice = orderStrategy.price, StopPrice = orderStrategy.stopPrice.Value };
+                    //    break;
+                    //case AccountsAndTrading.OrderType.TRAILING_STOP_LIMIT:
+                    //    qcOrder = new TrailingStopLimitOrder { LimitPrice = orderStrategy.price, StopPrice = orderStrategy.stopPrice.Value };
+                    //    break;
+                    //case AccountsAndTrading.OrderType.NET_CREDIT:
+                    //case AccountsAndTrading.OrderType.NET_DEBIT:
+                    //case AccountsAndTrading.OrderType.NET_ZERO:
+                    case AccountsAndTrading.OrderType.EXERCISE:
+                        orderType = Orders.OrderType.OptionExercise;
+                        break;
+                    default:
+                        throw new NotImplementedException($"The TD order type {orderStrategy.orderType} is not implemented.");
+                }
+
+                return orderType;
             }
         }
     }

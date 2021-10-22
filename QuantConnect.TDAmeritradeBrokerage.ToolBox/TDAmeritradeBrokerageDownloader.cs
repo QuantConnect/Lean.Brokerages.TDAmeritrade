@@ -29,15 +29,15 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
     /// </summary>
     public class TDAmeritradeBrokerageDownloader : IDataDownloader
     {
+        private readonly TDAmeritradeClient client;
+
         /// <summary>
         /// Initialize <see cref="TDAmeritradeBrokerageDownloader"/>
         /// </summary>
         public TDAmeritradeBrokerageDownloader()
         {
-            var clientID = Config.Get("td-client-id", "");
-            var redirectUri = Config.Get("td-redirect-uri", "");
-            var tdCredentials = Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get("td-credentials-provider", "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider"));
-            TDAmeritradeBrokerage.InitializeClient(clientID, redirectUri, tdCredentials);
+            //Pulls from config file
+            client = TDAmeritradeBrokerage.InitializeClient();
         }
 
         /// <summary>
@@ -50,7 +50,7 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
         /// <returns>Enumerable of base data for this symbol</returns>
         public IEnumerable<BaseData> Get(Symbol symbol, Resolution resolution, DateTime startUtc, DateTime endUtc)
         {
-            return TDAmeritradeBrokerage.GetPriceHistory(symbol, resolution, startUtc, endUtc, TimeZones.NewYork);
+            return TDAmeritradeBrokerage.GetPriceHistory(client, symbol, resolution, startUtc, endUtc, TimeZones.NewYork);
         }
     }
 }

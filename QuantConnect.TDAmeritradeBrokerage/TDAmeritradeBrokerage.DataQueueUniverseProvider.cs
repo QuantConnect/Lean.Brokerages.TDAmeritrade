@@ -49,7 +49,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var symbols = new List<Symbol>();
 
             var today = DateTime.UtcNow.ConvertFromUtc(TimeZones.NewYork).Date;
-            symbols.AddRange(_algorithm.OptionChainProvider.GetOptionContractList(symbol.Underlying, today));
+            symbols.AddRange(GetOptionContractList(symbol.Underlying, today));
 
             // Try to remove options contracts that have expired
             if (!includeExpired)

@@ -18,27 +18,183 @@ using QuantConnect.Tests;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Tests.Brokerages;
+using QuantConnect.Brokerages.TDAmeritrade;
+using System;
+using TDAmeritradeApi.Client;
+using QuantConnect.Brokerages;
+using QuantConnect.Tests.Common.Securities;
+using Moq;
+using QuantConnect.Util;
+using QuantConnect.Lean.Engine.TransactionHandlers;
+using QuantConnect.Tests.Engine;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Collections.Generic;
+using QuantConnect.Orders;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Tests.Engine.DataFeeds;
+using QuantConnect.Algorithm;
+using QuantConnect.Lean.Engine.Results;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Data.Market;
+using QuantConnect.Packets;
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.Lean.Engine.HistoricalData;
 
 namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
-    [TestFixture, Ignore("Not implemented")]
-    public partial class TDAmeritradeBrokerageTests : BrokerageTests
+    [TestFixture]
+    public partial class TDAmeritradeBrokerageTests : BrokerageTests, ICredentials
     {
-        protected override Symbol Symbol { get; }
-        protected override SecurityType SecurityType { get; }
+        protected override Symbol Symbol { get => Symbol.Create("SPY", SecurityType.Equity, Market.USA); }
+        protected override SecurityType SecurityType { get => Symbol.SecurityType; }
+
+        /// <summary>
+        /// TD User name
+        /// </summary>
+        /// <returns></returns>
+        public string GetUserName()
+        {
+            string username = "";
+
+            return username;
+        }
+
+        /// <summary>
+        /// TD password
+        /// </summary>
+        /// <returns></returns>
+        public string GetPassword()
+        {
+            //Add breakpoint for live edit
+            string password = "";
+
+            return password;
+        }
+
+        /// <summary>
+        /// TD multi-factor auth code
+        /// </summary>
+        /// <returns></returns>
+        public string GetSmsCode()
+        {
+            //Add breakpoint for live edit
+            string smsCode = "";
+
+            return smsCode;
+        }
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            throw new System.NotImplementedException();
+            var job = new LiveNodePacket() { BrokerageData = new()};
+
+            job.BrokerageData.Add("live-cash-balance", "[{Amount:100000000, Currency=USD'}]");
+
+            var marketHoursDatabase = MarketHoursDatabase.FromDataFolder();
+
+            var exchangeHours = marketHoursDatabase.GetExchangeHours(Market.USA, Symbol, SecurityType.Equity);
+
+            if (!exchangeHours.IsOpen(DateTime.Now, false))
+                throw new NotSupportedException("Market is currently closed.");
+
+            var synchronizer = new LiveSynchronizer();
+
+            TestableLiveTradingDataFeed feed = new();
+
+            var algorithm = new QCAlgorithm();
+
+            var orderProcessor = new TestOrderProcessor(OrderProvider, algorithm.Transactions);
+            algorithm.Transactions.SetOrderProcessor(orderProcessor);
+
+            var tdBrokerage = new TDAmeritradeBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio, TDAmeritradeBrokerageFactory.Configuration.AccountID, tdCredentials: this, paperTrade: true);
+            tdBrokerage.Connect();
+            tdBrokerage.SetJob(job);
+
+            var symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
+            var mapFilePrimaryExchangeProvider = new MapFilePrimaryExchangeProvider(TestGlobals.MapFileProvider);
+            var registeredTypesProvider = new RegisteredSecurityDataTypesProvider();
+            var securityService = new SecurityService(algorithm.Portfolio.CashBook,
+                marketHoursDatabase,
+                symbolPropertiesDatabase,
+                algorithm,
+                registeredTypesProvider,
+                new SecurityCacheProvider(algorithm.Portfolio),
+                mapFilePrimaryExchangeProvider);
+
+            algorithm.Securities.SetSecurityService(securityService);
+
+            var dataManager = new DataManagerStub(feed, algorithm, 
+                algorithm.TimeKeeper, marketHoursDatabase, securityService, true);
+
+            algorithm.SubscriptionManager.SetDataManager(dataManager);
+
+            synchronizer.Initialize(algorithm, dataManager);
+
+            feed.DataQueueHandler = tdBrokerage;
+            feed.Initialize(algorithm, job, new BacktestingResultHandler(),
+                TestGlobals.MapFileProvider, TestGlobals.FactorFileProvider, TestGlobals.DataProvider, dataManager, synchronizer, new DataChannelProvider());
+
+            var historyProvider = new BrokerageHistoryProvider();
+            historyProvider.SetBrokerage(tdBrokerage);
+
+            algorithm.HistoryProvider = historyProvider;
+
+            //set up algorithm
+
+            algorithm.SetLiveMode(true);
+            algorithm.SetDateTime(DateTime.UtcNow);
+
+            //Initialize
+            algorithm.SetBrokerageModel(new TDAmeritradeBrokerageModel());
+
+            var security = algorithm.AddSecurity(SecurityType.Equity, "SPY", Resolution.Minute, Market.USA, true, 1, true);
+
+            SecurityProvider[Symbol] = security;
+
+            var data = tdBrokerage.GetHistory(
+                new Data.HistoryRequest(DateTime.UtcNow.AddMinutes(-30),
+                DateTime.UtcNow, typeof(TradeBar), Symbol,
+                Resolution.Minute, exchangeHours,
+                TimeZones.NewYork, Resolution.Minute, true, false,
+                DataNormalizationMode.Adjusted, TickType.Trade)).ToList();
+
+            dataManager.Algorithm.Securities["SPY"].Update(data, data[0].GetType());
+
+            dataManager.Algorithm.PostInitialize();
+
+            DataQueueSubscribe(dataManager);
+
+            return tdBrokerage;
         }
+
+        private static void DataQueueSubscribe(DataManagerStub dataManager)
+        {
+            foreach (var subscribedSecurities in dataManager.Algorithm.Securities)
+            {
+                var security = subscribedSecurities.Value;
+                foreach (var config in security.Subscriptions)
+                {
+                    var request = new SubscriptionRequest(false, null, security, config, DateTime.UtcNow.AddDays(-1), Time.EndOfTime);
+                    dataManager.AddSubscription(request);
+                }
+            }
+        }
+
         protected override bool IsAsync()
         {
-            throw new System.NotImplementedException();
+            return true;
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
         {
-            throw new System.NotImplementedException();
+            if (Brokerage is TDAmeritradeBrokerage tdAmeritradeBrokerage)
+            {
+                var quote = tdAmeritradeBrokerage.GetMarketQuote(symbol);
+
+                return quote.AskPrice;
+            }
+            else
+                throw new NotSupportedException();
         }
 
 
@@ -49,11 +205,11 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
         {
             return new[]
             {
-                new TestCaseData(new MarketOrderTestParameters(Symbols.BTCUSD)).SetName("MarketOrder"),
-                new TestCaseData(new LimitOrderTestParameters(Symbols.BTCUSD, 10000m, 0.01m)).SetName("LimitOrder"),
-                new TestCaseData(new StopMarketOrderTestParameters(Symbols.BTCUSD, 10000m, 0.01m)).SetName("StopMarketOrder"),
-                new TestCaseData(new StopLimitOrderTestParameters(Symbols.BTCUSD, 10000m, 0.01m)).SetName("StopLimitOrder"),
-                new TestCaseData(new LimitIfTouchedOrderTestParameters(Symbols.BTCUSD, 10000m, 0.01m)).SetName("LimitIfTouchedOrder")
+                new TestCaseData(new MarketOrderTestParameters(Symbols.SPY)).SetName("MarketOrder"),
+                new TestCaseData(new LimitOrderTestParameters(Symbols.SPY, 10000m, 0.01m)).SetName("LimitOrder"),
+                new TestCaseData(new StopMarketOrderTestParameters(Symbols.SPY, 10000m, 0.01m)).SetName("StopMarketOrder"),
+                new TestCaseData(new StopLimitOrderTestParameters(Symbols.SPY, 10000m, 0.01m)).SetName("StopLimitOrder"),
+                new TestCaseData(new LimitIfTouchedOrderTestParameters(Symbols.SPY, 10000m, 0.01m)).SetName("LimitIfTouchedOrder")
             };
         }
 
@@ -97,6 +253,65 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
         public override void LongFromShort(OrderTestParameters parameters)
         {
             base.LongFromShort(parameters);
+        }
+    }
+
+    internal class TestOrderProcessor : IOrderProcessor
+    {
+        private OrderProvider _orderProvider;
+        private readonly SecurityTransactionManager _securityTransactionManager;
+
+        public TestOrderProcessor(OrderProvider orderProvider, SecurityTransactionManager securityTransactionManager)
+        {
+            _orderProvider = orderProvider;
+            _securityTransactionManager = securityTransactionManager;
+        }
+
+        public int OrdersCount => _orderProvider.OrdersCount;
+
+        public List<Order> GetOpenOrders(Func<Order, bool> filter = null)
+        {
+            return _orderProvider.GetOpenOrders(filter);
+        }
+
+        public IEnumerable<OrderTicket> GetOpenOrderTickets(Func<OrderTicket, bool> filter = null)
+        {
+            return _orderProvider.GetOpenOrderTickets(filter);
+        }
+
+        public Order GetOrderByBrokerageId(string brokerageId)
+        {
+            return _orderProvider.GetOrderByBrokerageId(brokerageId);
+        }
+
+        public Order GetOrderById(int orderId)
+        {
+            return _orderProvider.GetOrderById(orderId);
+        }
+
+        public IEnumerable<Order> GetOrders(Func<Order, bool> filter = null)
+        {
+            return _orderProvider.GetOrders(filter);
+        }
+
+        public OrderTicket GetOrderTicket(int orderId)
+        {
+            return _orderProvider.GetOrderById(orderId)?.ToOrderTicket(_securityTransactionManager);
+        }
+
+        public IEnumerable<OrderTicket> GetOrderTickets(Func<OrderTicket, bool> filter = null)
+        {
+            return _orderProvider.GetOrders(Convert(filter)).Select(order => order.ToOrderTicket(_securityTransactionManager));
+        }
+
+        private Func<Order, bool> Convert(Func<OrderTicket, bool> filter)
+        {
+            return order => filter?.Invoke(order.ToOrderTicket(_securityTransactionManager)) ?? true;
+        }
+
+        public OrderTicket Process(OrderRequest request)
+        {
+            return null;
         }
     }
 }

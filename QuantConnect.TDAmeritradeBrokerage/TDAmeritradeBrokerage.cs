@@ -23,12 +23,15 @@ using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using QuantConnect.Brokerages.Paper;
+using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.TimeInForces;
+using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Equity;
 using QuantConnect.Util;
@@ -52,9 +55,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     [BrokerageFactory(typeof(TDAmeritradeBrokerageFactory))]
     public partial class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider, IHistoryProvider, IOptionChainProvider
     {
-        private readonly string _accountId;
-        private readonly string _clientId;
-        private readonly string _redirectUri;
+        private string _accountId;
+        private static readonly object _apiClientLock = new object();
 
         // we're reusing the equity exchange here to grab typical exchange hours
         private static readonly EquityExchange Exchange =
@@ -64,7 +66,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         // polling timer for checking for fill events
         private readonly Timer _orderFillTimer;
-        private static TDAmeritradeClient tdClient;
+
 
         private readonly IAlgorithm _algorithm;
         private readonly IOrderProvider _orderProvider;
@@ -78,6 +80,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         public override string AccountBaseCurrency => Currencies.USD;
 
+        private readonly HashSet<string> ErrorsDuringMarketHours = new HashSet<string>
+        {
+            "CheckForFillsError", "UnknownIdResolution", "ContingentOrderError", "NullResponse", "PendingOrderNotReturned"
+        };
+
+        private BrokerageAssistedPaperBrokerage _paperBrokerage;
+        private readonly bool _paperTrade;
+        private readonly TDAmeritradeClient _tdClient;
+
+        public bool IsPaperTrading { get => _paperTrade && _paperBrokerage != null; }
+
         /// <summary>
         /// Create a new TDAmeritradeBrokerage Object:
         /// </summary>
@@ -85,26 +98,80 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             IAlgorithm algorithm,
             IOrderProvider orderProvider,
             ISecurityProvider securityProvider,
-            IDataAggregator aggregator,
-            string accountId,
-            string clientId,
-            string redirectUri,
-            ICredentials tdCredentials)
+            string accountId = null,
+            string clientId = null,
+            string redirectUri = null,
+            ICredentials tdCredentials = null,
+            bool paperTrade = false)
             : base("TD Ameritrade Brokerage")
         {
             _algorithm = algorithm;
+            _paperTrade = paperTrade;
             _orderProvider = orderProvider;
             _securityProvider = securityProvider;
-            _aggregator = aggregator;
-            _accountId = accountId;
-            _clientId = clientId;
-            _redirectUri = redirectUri;
-
+            _aggregator = Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"));
 
             _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
             _subscriptionManager.SubscribeImpl += Subscribe;
             _subscriptionManager.UnsubscribeImpl += Unsubscribe;
-            InitializeClient(clientId, redirectUri, tdCredentials);
+            _tdClient = InitializeClient(clientId, redirectUri, tdCredentials);
+
+            DetermineOrValidateAccount(accountId).Wait();
+        }
+
+        /// <summary>
+        /// Determine if there is only 1 account and if so set the account ID else
+        /// validate that specified account actually exists.
+        /// </summary>
+        /// <param name="accountId">specified account ID can be null, empty, or whitespace</param>
+        /// <returns></returns>
+        private async Task DetermineOrValidateAccount(string accountId)
+        {
+            _accountId = accountId;
+
+            if (string.IsNullOrWhiteSpace(_accountId))
+            {
+                Log.Trace("No TD Ameritrade account specified. Checking if only 1 exists");
+
+                var accounts = await _tdClient.AccountsAndTradingApi.GetAllAccountsAsync();
+
+                accounts.DoForEach(account =>
+                {
+                    Log.Trace($"Found account: ID: {account.accountId} Type: {Enum.GetName(account.type)} IsDayTrader: {account.isDayTrader} RoundTrips: {account.roundTrips}");
+
+                    if (account is CashAccount cashAccount)
+                    {
+                        Log.Trace($"\t Current Trading Balance {cashAccount.currentBalances.cashAvailableForTrading}");
+                    }
+                    else if (account is MarginAccount marginAccount)
+                    {
+                        Log.Trace($"\t Available Funds (Non-Margin) {marginAccount.currentBalances.availableFundsNonMarginableTrade}");
+                    }
+                });
+
+                if (accounts.Count == 1)
+                {
+                    _accountId = accounts[0].accountId;
+                    Log.Trace("Setting account ID to the only account.");
+                }
+                else
+                {
+                    Log.Error("There are multiple accounts. Add account ID to config file.");
+                    Environment.Exit(1);
+                }
+            }
+            else
+            {
+                try
+                {
+                    await _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId);
+                }
+                catch
+                {
+                    Log.Error($"Account {_accountId} does not exist.");
+                    Environment.Exit(1);
+                }
+            }
         }
 
         /// <summary>
@@ -114,12 +181,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="clientId">This is the consumer key that is generated in MyApps</param>
         /// <param name="redirectUri">This is the callback url that is defined in MyApps</param>
         /// <param name="tdCredentials">Callback interface for supplying username, password, and multi-factor authorization code</param>
-        public static void InitializeClient(string clientId, string redirectUri, ICredentials tdCredentials)
+        public static TDAmeritradeClient InitializeClient(string clientId = null, string redirectUri = null, ICredentials tdCredentials = null)
         {
-            if (tdClient == null)
+            lock (_apiClientLock)
             {
-                tdClient = new TDAmeritradeClient(clientId, redirectUri);
-                tdClient.LogIn(tdCredentials).Wait();
+                if (tdCredentials is null)
+                    tdCredentials = TDAmeritradeBrokerageFactory.Configuration.Credentials;
+                if (clientId is null)
+                    clientId = TDAmeritradeBrokerageFactory.Configuration.ConsumerKey;
+                if (redirectUri is null)
+                    redirectUri = TDAmeritradeBrokerageFactory.Configuration.CallbackUrl;
+
+                var tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri);
+                tdAmeritradeClient.LogIn(tdCredentials).Wait();
+
+                return tdAmeritradeClient;
             }
         }
 
@@ -128,7 +204,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
-        public override bool IsConnected => _isDataQueueHandlerInitialized && tdClient.LiveMarketDataStreamer.IsConnected;
+        public override bool IsConnected => _tdClient.LiveMarketDataStreamer.IsConnected;
 
         /// <summary>
         /// Gets all open orders on the account.
@@ -136,8 +212,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>The open orders returned from IB</returns>
         public override List<Order> GetOpenOrders()
         {
+            if (IsPaperTrading)
+            {
+                return _paperBrokerage.GetOpenOrders();
+            }
+
             var orders = new List<Order>();
-            var openOrders = tdClient.AccountsAndTradingApi.GetAllOrdersAsync(_accountId, OrderStrategyStatusType.QUEUED).Result;
+
+            var openOrders = _tdClient.AccountsAndTradingApi.GetAllOrdersAsync(_accountId, OrderStrategyStatusType.QUEUED).Result;
 
             foreach (var openOrder in openOrders)
             {
@@ -154,6 +236,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>The current holdings from the account</returns>
         public override List<Holding> GetAccountHoldings()
         {
+            if (IsPaperTrading)
+            {
+                return _paperBrokerage.GetAccountHoldings();
+            }
+
             var holdings = GetPositions().Select(ConvertToHolding).Where(x => x.Quantity != 0).ToList();
             var tickers = holdings.Select(x => TDAmeritradeToLeanMapper.GetBrokerageSymbol(x.Symbol)).ToList();
 
@@ -170,6 +257,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return holdings;
         }
 
+        public MarketQuote GetMarketQuote(Symbol symbol)
+        {
+            var brokerSymbol = TDAmeritradeToLeanMapper.GetBrokerageSymbol(symbol);
+
+            return _tdClient.MarketDataApi.GetQuote(brokerSymbol).Result;
+        }
+
         /// <summary>
         /// Get Quotes wrapper of api
         /// </summary>
@@ -177,7 +271,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>a dictionary mapping ticker symbol to quote</returns>
         private Dictionary<string, MarketQuote> GetQuotes(List<string> tickers)
         {
-            return tdClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
+            return _tdClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
         }
 
         /// <summary>
@@ -196,7 +290,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         symbol.ID.Market,
                         symbol,
                         symbol.SecurityType,
-                        _algorithm.Portfolio.CashBook.AccountCurrency)
+                        AccountBaseCurrency)
                     .ContractMultiplier;
 
                 averagePrice /= multiplier;
@@ -218,7 +312,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>positions</returns>
         private IEnumerable<AccountsAndTrading.Position> GetPositions()
         {
-            var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+            var account = _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
 
             return account.positions ?? Enumerable.Empty<AccountsAndTrading.Position>();
         }
@@ -231,7 +325,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             return new List<CashAmount>
             {
-                new CashAmount(GetCurrentCashBalance(), Currencies.USD)
+                new CashAmount(GetCurrentCashBalance(), AccountBaseCurrency)
             };
         }
 
@@ -241,7 +335,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>cash balance</returns>
         private decimal GetCurrentCashBalance()
         {
-            var account = tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+            var account = _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
 
             if (account is CashAccount cashAccount)
                 return cashAccount.currentBalances.totalCash;
@@ -263,19 +357,29 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 Log.Trace($"{nameof(TDAmeritradeBrokerage)}.PlaceOrder(): {order}");
 
                 var holdingQuantity = _securityProvider.GetHoldingsQuantity(order.Symbol);
-
                 var orderStrategy = TDAmeritradeToLeanMapper.ConvertToOrderStrategy(order, holdingQuantity);
 
-                tdClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
+                if (IsPaperTrading)
+                {
+                    _paperBrokerage.PlaceOrder(order);
+                }
+                else
+                {
+                    _tdClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
+                }
 
-                return true;
+                order.Status = OrderStatus.Submitted;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "PlaceOrderError", ex.Message));
 
-                return false;
+                order.Status = OrderStatus.Invalid;
             }
+
+            OnOrderEvent(new OrderEvent(order, order.Time, OrderFee.Zero));
+
+            return order.Status == OrderStatus.Submitted;
         }
 
         /// <summary>
@@ -291,8 +395,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var replaceOrder = TDAmeritradeToLeanMapper.ConvertToOrderStrategy(order, order.Quantity);
 
-                tdClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
-
+                if (IsPaperTrading)
+                {
+                    _paperBrokerage.UpdateOrder(order);
+                }
+                else
+                {
+                    _tdClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -314,8 +424,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             try
             {
-
-                tdClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
+                if (IsPaperTrading)
+                {
+                    if (_paperBrokerage.CancelOrder(order))
+                    {
+                        var cancelEvent = new OrderEvent(order, order.Time, OrderFee.Zero);
+                        cancelEvent.Status = OrderStatus.Canceled;
+                        OnOrderEvent(cancelEvent);
+                    }
+                }
+                else
+                {
+                    _tdClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
+                }
 
                 return true;
             }
@@ -332,7 +453,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         public override void Connect()
         {
-            tdClient.LiveMarketDataStreamer.LoginAsync(_accountId).Wait();
+            lock (_apiClientLock)
+            {
+                _tdClient.LiveMarketDataStreamer.LoginAsync(_accountId).Wait();
+            }
         }
 
         /// <summary>
@@ -340,7 +464,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         public override void Disconnect()
         {
-            tdClient.LiveMarketDataStreamer.LogoutAsync().Wait();
+            try
+            {
+                _tdClient.LiveMarketDataStreamer.LogoutAsync().Wait();
+            }
+            catch { }
         }
 
         /// <summary>
@@ -349,12 +477,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public override void Dispose()
         {
             _orderFillTimer.DisposeSafely();
+            if (IsPaperTrading)
+            {
+                _paperBrokerage.OrderStatusChanged -= (sender, e) => OnOrderEvent(e);
+                _paperBrokerage.DisposeSafely();
+            }
         }
-
-        private readonly HashSet<string> ErrorsDuringMarketHours = new HashSet<string>
-        {
-            "CheckForFillsError", "UnknownIdResolution", "ContingentOrderError", "NullResponse", "PendingOrderNotReturned"
-        };
 
         /// <summary>
         /// Event invocator for the Message event

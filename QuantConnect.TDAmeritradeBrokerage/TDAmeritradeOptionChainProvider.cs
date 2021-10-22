@@ -14,6 +14,7 @@
 */
 
 using QuantConnect.Interfaces;
+using QuantConnect.Logging;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -39,7 +40,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             try
             {
-                var optionsChain = tdClient.MarketDataApi.GetOptionChainAsync(symbol.Value).Result;
+                var optionsChain = _tdClient.MarketDataApi.GetOptionChainAsync(symbol.Value).Result;
 
                 List<Symbol> options = new List<Symbol>();
 

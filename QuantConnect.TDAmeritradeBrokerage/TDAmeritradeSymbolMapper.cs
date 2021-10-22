@@ -69,10 +69,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 optionRight = OptionRight.Put;
                 dateAndStrike = info.Split('P');
             }
+
             var expiration = DateTime.ParseExact(dateAndStrike[0], "MMddyy", CultureInfo.InvariantCulture);
             decimal strike = decimal.Parse(dateAndStrike[1], CultureInfo.InvariantCulture);
 
-            return GetLeanSymbol(symbol, SecurityType.Option, Market.USA.ToString(), expiration, strike, optionRight);
+            //Only European on index funds
+            return Symbol.CreateOption(symbol, Market.USA, OptionStyle.American, optionRight, strike, expiration);
         }
 
         /// <summary>

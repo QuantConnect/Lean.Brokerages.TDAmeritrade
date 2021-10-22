@@ -20,6 +20,13 @@ using QuantConnect.Tests;
 using QuantConnect.Logging;
 using QuantConnect.Data.Market;
 using QuantConnect.Brokerages.TDAmeritrade;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
@@ -33,9 +40,9 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
                 return new[]
                 {
                     // valid parameters, for example
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Tick, false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Minute, false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Second, false),
+                    new TestCaseData(Symbols.SPY, Resolution.Tick, false),
+                    new TestCaseData(Symbols.SPY, Resolution.Minute, false),
+                    new TestCaseData(Symbols.SPY, Resolution.Second, false),
                 };
             }
         }
@@ -45,6 +52,8 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
         {
             var cancelationToken = new CancellationTokenSource();
             var brokerage = (TDAmeritradeBrokerage)Brokerage;
+
+            var subscriptionManager = GetPrivateField<DataQueueHandlerSubscriptionManager>(brokerage, "_subscriptionManager");
 
             SubscriptionDataConfig[] configs;
             if (resolution == Resolution.Tick)
@@ -59,24 +68,75 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
                     GetSubscriptionDataConfig<TradeBar>(symbol, resolution) };
             }
 
+            ConcurrentDictionary<MarketDataType, ConcurrentQueue<BaseData>> data = new ConcurrentDictionary<MarketDataType, ConcurrentQueue<BaseData>>();
+            List<Task> tasks = new List<Task>();
             foreach (var config in configs)
             {
-                ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
+                tasks.Add(ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
                     cancelationToken,
-                    (baseData) => { if (baseData != null) { Log.Trace("{baseData}"); }
-                    });
+                    (baseData) =>
+                    {
+                        if (baseData != null)
+                        {
+                            if (!data.ContainsKey(baseData.DataType))
+                            {
+                                data.TryAdd(baseData.DataType, new ConcurrentQueue<BaseData>());
+                            }
+
+                            data[baseData.DataType].Enqueue(baseData);
+                        }
+                    }));
             }
 
-            Thread.Sleep(20000);
+            var types = configs.Select(c => ConvertTo(c.TickType)).Distinct();
+
+            WaitUntilCondition(() => data.Keys.All(t => types.Contains(t)), 20000);
 
             foreach (var config in configs)
             {
                 brokerage.Unsubscribe(config);
             }
 
-            Thread.Sleep(20000);
+            WaitUntilCondition(() => !subscriptionManager.IsSubscribed(symbol, TickType.Trade) &&
+                                    !subscriptionManager.IsSubscribed(symbol, TickType.Quote), 20000);
 
             cancelationToken.Cancel();
+
+            Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(60));
+        }
+
+        public static T GetPrivateField<T>(object @object, string name)
+        {
+            var field = @object
+                .GetType()
+                .GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            return (T)field?.GetValue(@object);
+        }
+
+        private static void WaitUntilCondition(Func<bool> condition, long maxWaitTimeInMilliseconds)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            while (!condition() && stopwatch.ElapsedMilliseconds < maxWaitTimeInMilliseconds)
+            {
+                Thread.Sleep(1);
+            }
+        }
+
+        private MarketDataType ConvertTo(TickType tickType)
+        {
+            switch (tickType)
+            {
+                case TickType.Trade:
+                    return MarketDataType.TradeBar;
+                case TickType.Quote:
+                    return MarketDataType.QuoteBar;
+                //case TickType.OpenInterest: //Options and futures
+                //    break;
+                default:
+                    return MarketDataType.Tick;
+            }
         }
     }
 }

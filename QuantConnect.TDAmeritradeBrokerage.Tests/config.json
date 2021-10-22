@@ -1,4 +1,10 @@
 {
   "data-folder": "../../../../Lean/Data/",
-  "data-directory": "../../../../Lean/Data/"
+  "data-directory": "../../../../Lean/Data/",
+
+  // td ameritrade configuration
+  "tda-account-id": "",
+  "tda-consumer-key": "",
+  "tda-callback-url": "",
+  "tda-credentials-provider": "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider"
 }

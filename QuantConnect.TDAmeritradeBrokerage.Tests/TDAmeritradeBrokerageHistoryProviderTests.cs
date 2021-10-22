@@ -26,10 +26,11 @@ using System.Collections.Generic;
 using QuantConnect.Configuration;
 using QuantConnect.Util;
 using TDAmeritradeApi.Client;
+using QuantConnect.Lean.Engine.DataFeeds;
 
 namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
-    [TestFixture, Ignore("Not implemented")]
+    [TestFixture]
     public class TDAmeritradeBrokerageHistoryProviderTests
     {
         private static TestCaseData[] TestParameters
@@ -39,13 +40,16 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
                 return new[]
                 {
                     // valid parameters, example:
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Tick, TimeSpan.FromMinutes(1), TickType.Quote, typeof(Tick), false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Minute, TimeSpan.FromMinutes(10), TickType.Quote, typeof(QuoteBar), false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Daily, TimeSpan.FromDays(10), TickType.Quote, typeof(QuoteBar), false),
+                    //does not support tick data or quote data just trade bars
+                    new TestCaseData(Symbols.SPY, Resolution.Tick, TimeSpan.FromMinutes(1), TickType.Quote, typeof(Tick), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Minute, TimeSpan.FromMinutes(10), TickType.Quote, typeof(QuoteBar), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Hour, TimeSpan.FromHours(10), TickType.Quote, typeof(QuoteBar), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Daily, TimeSpan.FromDays(10), TickType.Quote, typeof(QuoteBar), false),
 
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Tick, TimeSpan.FromMinutes(1), TickType.Trade, typeof(Tick), false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Minute, TimeSpan.FromMinutes(10), TickType.Trade, typeof(TradeBar), false),
-                    new TestCaseData(Symbols.BTCUSD, Resolution.Daily, TimeSpan.FromDays(10), TickType.Trade, typeof(TradeBar), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Tick, TimeSpan.FromMinutes(1), TickType.Trade, typeof(Tick), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Minute, TimeSpan.FromMinutes(10), TickType.Trade, typeof(TradeBar), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Hour, TimeSpan.FromHours(10), TickType.Trade, typeof(TradeBar), false),
+                    new TestCaseData(Symbols.SPY, Resolution.Daily, TimeSpan.FromDays(10), TickType.Trade, typeof(TradeBar), false),
                 };
             }
         }
@@ -55,18 +59,15 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
         {
             TestDelegate test = () =>
             {
-                var accountId = Config.Get("td-account-id");
-                var clientId = Config.Get("td-client-id");
-                var redirectUri = Config.Get("td-redirect-uri");
-                var tdCredentials = Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get("td-credentials-provider", "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider"));
+                var accountId = TDAmeritradeBrokerageFactory.Configuration.AccountID;
 
-                var brokerage = new TDAmeritradeBrokerage(null, null, null, null, accountId, clientId, redirectUri, tdCredentials);
+                var brokerage = new TDAmeritradeBrokerage(null, null, null, accountId);
 
                 var historyProvider = new BrokerageHistoryProvider();
                 historyProvider.SetBrokerage(brokerage);
                 historyProvider.Initialize(new HistoryProviderInitializeParameters(null, null, null,
                     null, null, null, null,
-                    false, null));
+                    false, new DataPermissionManager()));
 
                 var marketHoursDatabase = MarketHoursDatabase.FromDataFolder();
                 var now = DateTime.UtcNow;
@@ -86,6 +87,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
                         tickType)
                 };
 
+                bool foundTick = false, foundQuote = false, foundTradeBar = false;
                 foreach (var slice in historyProvider.GetHistory(requests, TimeZones.Utc))
                 {
                     if (resolution == Resolution.Tick)
@@ -93,19 +95,33 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
                         foreach (var tick in slice.Ticks[symbol])
                         {
                             Log.Trace($"{tick}");
+                            foundTick = true;
                         }
                     }
                     else if(slice.QuoteBars.TryGetValue(symbol, out var quoteBar))
                     {
                         Log.Trace($"{quoteBar}");
+                        foundQuote = true;
                     }
                     else if(slice.Bars.TryGetValue(symbol, out var tradeBar))
                     {
                         Log.Trace($"{tradeBar}");
+                        foundTradeBar = true;
                     }
                 }
 
-                Log.Trace("Data points retrieved: " + historyProvider.DataPointCount);
+                if (tickType == TickType.Quote || dataType == typeof(Tick))
+                {
+                    Assert.IsTrue(historyProvider.DataPointCount == 0);
+                }
+                else
+                {
+                    Log.Trace("Data points retrieved: " + historyProvider.DataPointCount);
+                    Assert.AreEqual(foundTick, dataType == typeof(Tick));
+                    Assert.AreEqual(foundQuote, dataType == typeof(QuoteBar));
+                    Assert.AreEqual(foundTradeBar, dataType == typeof(TradeBar));
+                    Assert.IsTrue(historyProvider.DataPointCount > 0);
+                }
             };
 
             if (throwsException)

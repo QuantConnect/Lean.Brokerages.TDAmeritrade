@@ -38,9 +38,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public static class Configuration
         {
             internal static readonly string AccountIDConfigFileKey = "tda-account-id";
-            internal static readonly string ClientIDConfigFileKey = "tda-client-id";
-            internal static readonly string RedirectUriConfigFileKey = "tda-redirect-uri";
-            internal static readonly string CredentialsProviderConfigFileKey = "td-credentials-provider";
+            internal static readonly string ConsumerKeyConfigFileKey = "tda-consumer-key";
+            internal static readonly string CallbackUrlConfigFileKey = "tda-callback-url";
+            internal static readonly string CredentialsProviderConfigFileKey = "tda-credentials-provider";
 
             /// <summary>
             /// Gets the account ID to be used when instantiating a brokerage
@@ -50,10 +50,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             /// <summary>
             /// Gets the access token from configuration
             /// </summary>
-            public static string ClientID => Config.Get(ClientIDConfigFileKey);
+            public static string ConsumerKey => Config.Get(ConsumerKeyConfigFileKey);
 
-            public static string RedirectUri => Config.Get(RedirectUriConfigFileKey);
+            public static string CallbackUrl => Config.Get(CallbackUrlConfigFileKey);
 
+            public static ICredentials Credentials => Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get(CredentialsProviderConfigFileKey, typeof(TDCliCredentialProvider).FullName));
         }
 
         /// <summary>
@@ -78,8 +79,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 var data = new Dictionary<string, string>
                 {
                     { Configuration.AccountIDConfigFileKey, Configuration.AccountID.ToStringInvariant() },
-                    { Configuration.ClientIDConfigFileKey, Configuration.ClientID.ToStringInvariant() },
-                    { Configuration.RedirectUriConfigFileKey, Configuration.RedirectUri.ToStringInvariant() }
+                    { Configuration.ConsumerKeyConfigFileKey, Configuration.ConsumerKey.ToStringInvariant() },
+                    { Configuration.CallbackUrlConfigFileKey, Configuration.CallbackUrl.ToStringInvariant() },
                 };
                 return data;
             }
@@ -101,19 +102,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var errors = new List<string>();
             var accountId = Read<string>(job.BrokerageData, Configuration.AccountIDConfigFileKey, errors);
-            var clientId = Read<string>(job.BrokerageData, Configuration.ClientIDConfigFileKey, errors);
-            var redirectUri = Read<string>(job.BrokerageData, Configuration.RedirectUriConfigFileKey, errors);
+            var clientId = Read<string>(job.BrokerageData, Configuration.ConsumerKeyConfigFileKey, errors);
+            var redirectUri = Read<string>(job.BrokerageData, Configuration.CallbackUrlConfigFileKey, errors);
 
 #pragma warning disable CA2000 // Dispose objects before losing scope
             var tdBrokerage = new TDAmeritradeBrokerage(
                 algorithm,
                 algorithm.Transactions,
                 algorithm.Portfolio,
-                Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager")),
                 accountId,
                 clientId,
-                redirectUri,
-                Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get(Configuration.CredentialsProviderConfigFileKey, "QuantConnect.Brokerages.TDAmeritrade.TDCliCredentialProvider")));
+                redirectUri);
 #pragma warning restore CA2000 // Dispose objects before losing scope
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.

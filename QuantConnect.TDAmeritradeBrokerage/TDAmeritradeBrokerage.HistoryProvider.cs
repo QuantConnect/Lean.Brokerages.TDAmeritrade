@@ -21,6 +21,7 @@ using NodaTime;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
+using QuantConnect.Logging;
 using QuantConnect.Util;
 using TDAmeritradeApi.Client;
 using TDAmeritradeApi.Client.Models.MarketData;
@@ -76,6 +77,28 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
+        /// Gets the history for the requested security
+        /// </summary>
+        /// <param name="request">The historical data request</param>
+        /// <returns>An enumerable of bars covering the span specified in the request</returns>
+        public override IEnumerable<BaseData> GetHistory(HistoryRequest request)
+        {
+            if (request.TickType != TickType.Trade)
+            {
+                yield break;
+            }
+
+            var history = GetPriceHistory(_tdClient, request.Symbol, request.Resolution, request.StartTimeUtc, request.EndTimeUtc, TimeZones.NewYork);
+
+            DataPointCount += history.Count();
+
+            foreach (var slice in TradeBarsToSlices(history))
+            {
+                yield return slice[request.Symbol];
+            }
+        }
+
+        /// <summary>
         /// Gets the history for the requested securities
         /// </summary>
         /// <param name="requests">The historical data requests</param>
@@ -85,7 +108,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             foreach (var request in requests)
             {
-                var history = GetPriceHistory(request.Symbol, request.Resolution, request.StartTimeUtc, request.EndTimeUtc, sliceTimeZone);
+                IEnumerable<TradeBar> history;
+                if (request.TickType == TickType.Trade)
+                {
+                    history = GetPriceHistory(_tdClient, request.Symbol, request.Resolution, request.StartTimeUtc, request.EndTimeUtc, sliceTimeZone);
+                }
+                else
+                {
+                    history = Enumerable.Empty<TradeBar>();
+                }
 
                 DataPointCount += history.Count();
 
@@ -104,7 +135,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="startDate">from date</param>
         /// <param name="endDate">to date</param>
         /// <returns>history</returns>
-        public static IEnumerable<TradeBar> GetPriceHistory(Symbol symbol, Resolution resolution, DateTime startDate, DateTime endDate, DateTimeZone sliceTimeZone)
+        public static IEnumerable<TradeBar> GetPriceHistory(TDAmeritradeClient tdClient, Symbol symbol, Resolution resolution, DateTime startDate, DateTime endDate, DateTimeZone sliceTimeZone)
         {
             if (startDate >= endDate)
             {
@@ -145,7 +176,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             return history;
-        }    
+        }
 
         /// <summary>
         /// Event invocator for the <see cref="InvalidConfigurationDetected"/> event
@@ -210,7 +241,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private IEnumerable<Slice> CandlesToSlices(Symbol symbol, CandleList history, TimeSpan time)
         {
             var tradeBars = CandlesToTradeBars(symbol, history, time);
-            
+
             return TradeBarsToSlices(tradeBars);
         }
 

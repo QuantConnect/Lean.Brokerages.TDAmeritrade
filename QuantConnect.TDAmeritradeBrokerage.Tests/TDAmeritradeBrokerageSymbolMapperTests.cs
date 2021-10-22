@@ -14,22 +14,55 @@
 */
 
 using NUnit.Framework;
+using QuantConnect.Brokerages.TDAmeritrade;
+using QuantConnect.Tests;
+using System;
 
 namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
-    [TestFixture, Ignore("Not implemented")]
+    [TestFixture]
     public class TDAmeritradeBrokerageSymbolMapperTests
     {
         [Test]
-        public void ReturnsCorrectLeanSymbol()
+        public void ReturnsCorrectLeanSymbol_Equity()
         {
+            var symbolMapper = new TDAmeritradeSymbolMapper();
 
+            var convertedSymbol = symbolMapper.GetLeanSymbol("SPY", SecurityType.Equity, Market.USA);
+
+            Assert.AreEqual(Symbols.SPY, convertedSymbol);
         }
 
         [Test]
-        public void ReturnsCorrectBrokerageSymbol()
+        public void ReturnsCorrectBrokerageSymbol_Equity()
         {
+            var symbolMapper = new TDAmeritradeSymbolMapper();
 
+            var convertedSymbol = symbolMapper.GetBrokerageSymbol(Symbols.SPY);
+
+            Assert.AreEqual("SPY", convertedSymbol);
+        }
+
+        [Test]
+        public void ReturnsCorrectLeanSymbol_EquityOptions()
+        {
+            var symbolMapper = new TDAmeritradeSymbolMapper();
+
+            var convertedSymbol = symbolMapper.GetLeanSymbol($"SPY_{DateTime.Today:MMddyy}C1000", SecurityType.Option, Market.USA, DateTime.Today, 1000, OptionRight.Call);
+
+            var leanSymbol = Symbol.CreateOption(Symbols.SPY, Market.USA, OptionStyle.American, OptionRight.Call, 1000, DateTime.Today);
+
+            Assert.AreEqual(leanSymbol, convertedSymbol);
+        }
+
+        [Test]
+        public void ReturnsCorrectBrokerageSymbol_EquityOptions()
+        {
+            var symbolMapper = new TDAmeritradeSymbolMapper();
+
+            var leanSymbol = Symbol.CreateOption(Symbols.SPY, Market.USA, OptionStyle.American, OptionRight.Call, 1000, DateTime.Today);
+
+            Assert.AreEqual($"SPY_{DateTime.Today:MMddyy}C1000", symbolMapper.GetBrokerageSymbol(leanSymbol));
         }
     }
 }

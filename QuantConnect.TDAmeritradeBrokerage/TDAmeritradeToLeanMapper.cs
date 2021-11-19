@@ -143,7 +143,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         /// <param name="assetType">the security's type</param>
         /// <returns>LEAN <see cref="SecurityType"/></returns>
-        private static SecurityType GetSecurityType(InstrumentAssetType assetType)
+        public static SecurityType GetSecurityType(InstrumentAssetType assetType)
         {
             switch (assetType)
             {
@@ -155,7 +155,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case InstrumentAssetType.INDEX:
                     return SecurityType.Index;
                 default:
-                    throw new NotSupportedException($"{assetType} is not supported.");
+                    return SecurityType.Base;
             }
         }
 

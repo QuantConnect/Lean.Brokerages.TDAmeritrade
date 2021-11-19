@@ -54,7 +54,7 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
                 {
                     // Download data
                     var pairObject = symbolMapper.GetLeanSymbol(ticker, castSecurityType, Market.USA);
-                    var data = downloader.Get(pairObject, castResolution, startDate, endDate);
+                    var data = downloader.Get(new DataDownloaderGetParameters(pairObject, castResolution, startDate, endDate));
 
                     // Write data
                     var writer = new LeanDataWriter(castResolution, pairObject, dataDirectory);

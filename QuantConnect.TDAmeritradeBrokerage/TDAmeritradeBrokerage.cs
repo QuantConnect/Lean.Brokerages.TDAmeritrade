@@ -56,7 +56,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     public partial class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider, IHistoryProvider, IOptionChainProvider
     {
         private string _accountId;
-        private static readonly object _apiClientLock = new object();
+        private static readonly object _apiClientLock = new();
+        private static readonly RateGate _nonOrderRateGate = new(1, TimeSpan.FromSeconds(1)); //  personal use non-commercial applications
 
         // we're reusing the equity exchange here to grab typical exchange hours
         private static readonly EquityExchange Exchange =
@@ -66,8 +67,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         // polling timer for checking for fill events
         private readonly Timer _orderFillTimer;
-
-
         private readonly IAlgorithm _algorithm;
         private readonly IOrderProvider _orderProvider;
         private readonly ISecurityProvider _securityProvider;
@@ -185,6 +184,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             lock (_apiClientLock)
             {
+                if(_nonOrderRateGate.IsRateLimited)
+                {
+                    _nonOrderRateGate.WaitToProceed();
+                }
+
                 if (tdCredentials is null)
                     tdCredentials = TDAmeritradeBrokerageFactory.Configuration.Credentials;
                 if (clientId is null)
@@ -193,6 +197,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     redirectUri = TDAmeritradeBrokerageFactory.Configuration.CallbackUrl;
 
                 var tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri);
+                Thread.Sleep(2000); //wait 2 seconds regardless of rate gate
                 tdAmeritradeClient.LogIn(tdCredentials).Wait();
 
                 return tdAmeritradeClient;
@@ -259,6 +264,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public MarketQuote GetMarketQuote(Symbol symbol)
         {
+            if(_nonOrderRateGate.IsRateLimited)
+            {
+                _nonOrderRateGate.WaitToProceed();
+            }
+
             var brokerSymbol = TDAmeritradeToLeanMapper.GetBrokerageSymbol(symbol);
 
             return _tdClient.MarketDataApi.GetQuote(brokerSymbol).Result;

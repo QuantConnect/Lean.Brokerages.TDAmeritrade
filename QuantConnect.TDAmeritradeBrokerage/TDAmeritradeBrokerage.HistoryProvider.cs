@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using NodaTime;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
@@ -147,35 +148,50 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var history = Enumerable.Empty<TradeBar>();
 
-            switch (resolution)
+            lock (_apiClientLock)
             {
-                case Resolution.Tick:
-                case Resolution.Second:
-                    break;
-
-                case Resolution.Minute:
-                    history = GetHistoryMinute(tdClient, symbol, start, end);
-                    break;
-
-                case Resolution.Hour:
-                    history = GetHistoryHour(tdClient, symbol, start, end);
-                    break;
-
-                case Resolution.Daily:
-                    history = GetHistoryDaily(tdClient, symbol, start, end);
-                    break;
-            }
-
-            if (sliceTimeZone != TimeZones.NewYork)
-            {
-                history.DoForEach(bar =>
+                if (_nonOrderRateGate.IsRateLimited)
                 {
-                    bar.Time = bar.Time.ConvertTo(TimeZones.NewYork, sliceTimeZone);
-                    bar.EndTime = bar.EndTime.ConvertTo(TimeZones.NewYork, sliceTimeZone);
-                });
-            }
+                    _nonOrderRateGate.WaitToProceed();
+                }
 
-            return history;
+                try
+                {
+                    switch (resolution)
+                    {
+                        case Resolution.Tick:
+                        case Resolution.Second:
+                            break;
+
+                        case Resolution.Minute:
+                            history = GetHistoryMinute(tdClient, symbol, start, end);
+                            break;
+
+                        case Resolution.Hour:
+                            history = GetHistoryHour(tdClient, symbol, start, end);
+                            break;
+
+                        case Resolution.Daily:
+                            history = GetHistoryDaily(tdClient, symbol, start, end);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex);
+                }
+
+                if (sliceTimeZone != TimeZones.NewYork)
+                {
+                    history.DoForEach(bar =>
+                    {
+                        bar.Time = bar.Time.ConvertTo(TimeZones.NewYork, sliceTimeZone);
+                        bar.EndTime = bar.EndTime.ConvertTo(TimeZones.NewYork, sliceTimeZone);
+                    });
+                }
+
+                return history;
+            }
         }
 
         /// <summary>

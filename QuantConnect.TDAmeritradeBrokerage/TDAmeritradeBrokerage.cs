@@ -85,8 +85,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         };
 
         private BrokerageAssistedPaperBrokerage _paperBrokerage;
+        private static TDAmeritradeClient _tdAmeritradeClient;
         private readonly bool _paperTrade;
-        private readonly TDAmeritradeClient _tdClient;
 
         public bool IsPaperTrading { get => _paperTrade && _paperBrokerage != null; }
 
@@ -113,7 +113,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
             _subscriptionManager.SubscribeImpl += Subscribe;
             _subscriptionManager.UnsubscribeImpl += Unsubscribe;
-            _tdClient = InitializeClient(clientId, redirectUri, tdCredentials);
+            InitializeClient(clientId, redirectUri, tdCredentials);
 
             DetermineOrValidateAccount(accountId).Wait();
         }
@@ -132,7 +132,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 Log.Trace("No TD Ameritrade account specified. Checking if only 1 exists");
 
-                var accounts = await _tdClient.AccountsAndTradingApi.GetAllAccountsAsync();
+                var accounts = await _tdAmeritradeClient.AccountsAndTradingApi.GetAllAccountsAsync();
 
                 accounts.DoForEach(account =>
                 {
@@ -163,7 +163,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 try
                 {
-                    await _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId);
+                    await _tdAmeritradeClient.AccountsAndTradingApi.GetAccountAsync(_accountId);
                 }
                 catch
                 {
@@ -180,27 +180,23 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="clientId">This is the consumer key that is generated in MyApps</param>
         /// <param name="redirectUri">This is the callback url that is defined in MyApps</param>
         /// <param name="tdCredentials">Callback interface for supplying username, password, and multi-factor authorization code</param>
-        public static TDAmeritradeClient InitializeClient(string clientId = null, string redirectUri = null, ICredentials tdCredentials = null)
+        public static void InitializeClient(string clientId = null, string redirectUri = null, ICredentials tdCredentials = null)
         {
             lock (_apiClientLock)
             {
-                if(_nonOrderRateGate.IsRateLimited)
+                if (_tdAmeritradeClient is null)
                 {
-                    _nonOrderRateGate.WaitToProceed();
+                    if (tdCredentials is null)
+                        tdCredentials = TDAmeritradeBrokerageFactory.Configuration.Credentials;
+                    if (clientId is null)
+                        clientId = TDAmeritradeBrokerageFactory.Configuration.ConsumerKey;
+                    if (redirectUri is null)
+                        redirectUri = TDAmeritradeBrokerageFactory.Configuration.CallbackUrl;
+
+                    _tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri);
+
+                    _tdAmeritradeClient.LogIn(tdCredentials).Wait();
                 }
-
-                if (tdCredentials is null)
-                    tdCredentials = TDAmeritradeBrokerageFactory.Configuration.Credentials;
-                if (clientId is null)
-                    clientId = TDAmeritradeBrokerageFactory.Configuration.ConsumerKey;
-                if (redirectUri is null)
-                    redirectUri = TDAmeritradeBrokerageFactory.Configuration.CallbackUrl;
-
-                var tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri);
-                Thread.Sleep(2000); //wait 2 seconds regardless of rate gate
-                tdAmeritradeClient.LogIn(tdCredentials).Wait();
-
-                return tdAmeritradeClient;
             }
         }
 
@@ -209,7 +205,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
-        public override bool IsConnected => _tdClient.LiveMarketDataStreamer.IsConnected;
+        public override bool IsConnected => _tdAmeritradeClient.LiveMarketDataStreamer.IsConnected;
 
         /// <summary>
         /// Gets all open orders on the account.
@@ -224,7 +220,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var orders = new List<Order>();
 
-            var openOrders = _tdClient.AccountsAndTradingApi.GetAllOrdersAsync(_accountId, OrderStrategyStatusType.QUEUED).Result;
+            var openOrders = _tdAmeritradeClient.AccountsAndTradingApi.GetAllOrdersAsync(_accountId, OrderStrategyStatusType.QUEUED).Result;
 
             foreach (var openOrder in openOrders)
             {
@@ -271,7 +267,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var brokerSymbol = TDAmeritradeToLeanMapper.GetBrokerageSymbol(symbol);
 
-            return _tdClient.MarketDataApi.GetQuote(brokerSymbol).Result;
+            return _tdAmeritradeClient.MarketDataApi.GetQuote(brokerSymbol).Result;
         }
 
         /// <summary>
@@ -281,7 +277,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>a dictionary mapping ticker symbol to quote</returns>
         private Dictionary<string, MarketQuote> GetQuotes(List<string> tickers)
         {
-            return _tdClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
+            return _tdAmeritradeClient.MarketDataApi.GetQuotes(tickers.ToArray()).Result;
         }
 
         /// <summary>
@@ -322,7 +318,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>positions</returns>
         private IEnumerable<AccountsAndTrading.Position> GetPositions()
         {
-            var account = _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+            var account = _tdAmeritradeClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
 
             return account.positions ?? Enumerable.Empty<AccountsAndTrading.Position>();
         }
@@ -345,7 +341,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>cash balance</returns>
         private decimal GetCurrentCashBalance()
         {
-            var account = _tdClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
+            var account = _tdAmeritradeClient.AccountsAndTradingApi.GetAccountAsync(_accountId).Result;
 
             if (account is CashAccount cashAccount)
                 return cashAccount.currentBalances.totalCash;
@@ -375,7 +371,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 }
                 else
                 {
-                    _tdClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
+                    _tdAmeritradeClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
                 }
 
                 order.Status = OrderStatus.Submitted;
@@ -411,7 +407,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 }
                 else
                 {
-                    _tdClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
+                    _tdAmeritradeClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
                 }
                 return true;
             }
@@ -445,7 +441,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 }
                 else
                 {
-                    _tdClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
+                    _tdAmeritradeClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
                 }
 
                 return true;
@@ -465,7 +461,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             lock (_apiClientLock)
             {
-                _tdClient.LiveMarketDataStreamer.LoginAsync(_accountId).Wait();
+                _tdAmeritradeClient.LiveMarketDataStreamer.LoginAsync(_accountId).Wait();
             }
         }
 
@@ -476,7 +472,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             try
             {
-                _tdClient.LiveMarketDataStreamer.LogoutAsync().Wait();
+                _tdAmeritradeClient.LiveMarketDataStreamer.LogoutAsync().Wait();
             }
             catch { }
         }

@@ -59,7 +59,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             //set once
-            _tdClient.LiveMarketDataStreamer.MarketData.DataReceived += OnMarketDateReceived;
+            _tdAmeritradeClient.LiveMarketDataStreamer.MarketData.DataReceived += OnMarketDateReceived;
         }
 
         /// <summary>
@@ -165,7 +165,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (symbolsRemoved)
             {
-                _tdClient.LiveMarketDataStreamer.UnsubscribeAsync(TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes, symbolsToRemove.ToArray()).Wait();
+                _tdAmeritradeClient.LiveMarketDataStreamer.UnsubscribeAsync(TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes, symbolsToRemove.ToArray()).Wait();
             }
 
             return true;
@@ -189,20 +189,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     case SecurityType.Index:
                     case SecurityType.Equity:
-                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Equity, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Equity, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.IndexOption:
                     case SecurityType.Option:
-                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Option, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Option, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.Forex:
-                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Forex, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Forex, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.Future:
-                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Futures, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Futures, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                     case SecurityType.FutureOption:
-                        _tdClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
                         //default:
                         //    break;
@@ -219,7 +219,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.LevelOneQuotes)
             {
-                var dataDictionary = _tdClient.LiveMarketDataStreamer.MarketData[e]
+                var dataDictionary = _tdAmeritradeClient.LiveMarketDataStreamer.MarketData[e]
                     .OrderBy(kvp =>
                     {
                         var item = kvp.Value.IndividualItemType;
@@ -250,7 +250,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
             else if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.AccountActivity)
             {
-                var dataDictionary = _tdClient.LiveMarketDataStreamer.MarketData[e];
+                var dataDictionary = _tdAmeritradeClient.LiveMarketDataStreamer.MarketData[e];
 
                 if (dataDictionary.ContainsKey(_accountId))
                 {

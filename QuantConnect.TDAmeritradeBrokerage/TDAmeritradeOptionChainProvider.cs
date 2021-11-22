@@ -45,7 +45,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     _nonOrderRateGate.WaitToProceed();
                 }
 
-                var optionsChain = _tdClient.MarketDataApi.GetOptionChainAsync(symbol.Value).Result;
+                var optionsChain = _tdAmeritradeClient.MarketDataApi.GetOptionChainAsync(symbol.Value).Result;
 
                 List<Symbol> options = new List<Symbol>();
 

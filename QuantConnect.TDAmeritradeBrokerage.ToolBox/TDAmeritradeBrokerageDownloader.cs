@@ -32,7 +32,6 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
     /// </summary>
     public class TDAmeritradeBrokerageDownloader : IDataDownloader
     {
-        private readonly TDAmeritradeClient client;
         private readonly DateTime _minuteDateStartLimit;
         private readonly Dictionary<Symbol, Dictionary<Resolution, DateRange>> _symbolsToResolutionToDownloadedDataDateRange = new();
 
@@ -42,7 +41,7 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
         public TDAmeritradeBrokerageDownloader()
         {
             //Pulls from config file
-            client = TDAmeritradeBrokerage.InitializeClient();
+            TDAmeritradeBrokerage.InitializeClient();
             _minuteDateStartLimit = DateTime.UtcNow.AddDays(-45).Date;
         }
 
@@ -83,7 +82,7 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
 
             Log.Trace($"Downloading {resolution} data for {symbol} from {startUtc} to present");
 
-            var history = TDAmeritradeBrokerage.GetPriceHistory(client, symbol, resolution, startUtc, endUtc, TimeZones.NewYork);
+            var history = TDAmeritradeBrokerage.GetPriceHistory(symbol, resolution, startUtc, endUtc, TimeZones.NewYork);
 
             UpdateDownloadedDateRange(symbol, resolution, history);
 

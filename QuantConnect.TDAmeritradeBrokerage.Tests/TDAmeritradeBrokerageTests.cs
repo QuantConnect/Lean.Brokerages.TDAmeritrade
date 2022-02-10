@@ -46,6 +46,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
     [TestFixture]
     public partial class TDAmeritradeBrokerageTests : BrokerageTests
     {
+        private bool arePaperTrading = true;
         protected override Symbol Symbol { get => Symbol.Create("SPY", SecurityType.Equity, Market.USA); }
         protected override SecurityType SecurityType { get => Symbol.SecurityType; }
 
@@ -71,7 +72,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
             var orderProcessor = new TestOrderProcessor(OrderProvider, algorithm.Transactions);
             algorithm.Transactions.SetOrderProcessor(orderProcessor);
 
-            var tdBrokerage = new TDAmeritradeBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio, TDAmeritradeBrokerageFactory.Configuration.AccountID, tdCredentials: new DefaultTDCredentials(), paperTrade: true);
+            var tdBrokerage = new TDAmeritradeBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio, TDAmeritradeBrokerageFactory.Configuration.AccountID, tdCredentials: new DefaultTDCredentials(), paperTrade: arePaperTrading);
             tdBrokerage.Connect();
             tdBrokerage.SetJob(job);
 

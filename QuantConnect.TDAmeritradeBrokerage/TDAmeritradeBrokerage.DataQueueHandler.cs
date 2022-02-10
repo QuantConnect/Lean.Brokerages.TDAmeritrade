@@ -248,6 +248,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                     AddTickData(data);
                 }
+
+                if (IsPaperTrading)
+                {
+                    _paperBrokerage.TryAndFillOrders();
+                }
             }
             else if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.AccountActivity)
             {

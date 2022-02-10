@@ -45,6 +45,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         #region IDataQueueHandler implementation
 
         private readonly ConcurrentDictionary<string, Symbol> _subscribedTickers = new ConcurrentDictionary<string, Symbol>();
+        private ManualResetEvent _orderResultWaiter = new ManualResetEvent(false);
 
         /// <summary>
         /// Sets the job we're subscribing for
@@ -55,7 +56,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             if (_paperTrade && _paperBrokerage is null)
             {
                 _paperBrokerage = new(_algorithm, this, job);
-                _paperBrokerage.OrderStatusChanged += (sender, e) => OnOrderEvent(e);
+                _paperBrokerage.OrderStatusChanged += (sender, e) => 
+                { 
+                    OnOrderEvent(e);
+                    Task.Delay(1000).ContinueWith(task =>
+                    _paperBrokerage.TryAndFillOrders());
+                };
             }
 
             //set once
@@ -201,9 +207,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     case SecurityType.Future:
                         _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.Futures, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
                         break;
-                    case SecurityType.FutureOption:
-                        _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
-                        break;
+                    //case SecurityType.FutureOption:
+                    //    _tdAmeritradeClient.LiveMarketDataStreamer.SubscribeToLevelOneQuoteDataAsync(QuoteType.FuturesOptions, brokerageSymbolToLeanSymbolToSubscribe.Key).Wait();
+                    //    break;
                         //default:
                         //    break;
                 }
@@ -242,11 +248,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                     AddTickData(data);
                 }
-
-                if (IsPaperTrading)
-                {
-                    _paperBrokerage.TryAndFillOrders();
-                }
             }
             else if (e == TDAmeritradeApi.Client.Models.Streamer.MarketDataType.AccountActivity)
             {
@@ -269,7 +270,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                                 //Set extra information
                                 TDAmeritradeToLeanMapper.UpdateEventBasedOnMessage(orderEvent, orderMessage);
 
+                                order.Status = orderEvent.Status;
+
                                 OnOrderEvent(orderEvent);
+
+                                _orderResultWaiter.Set();
                             }
                             else
                                 Log.Error($"Could not parse returned TDA Order ID {tdOrder.OrderKey}");

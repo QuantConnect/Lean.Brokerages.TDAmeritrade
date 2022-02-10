@@ -61,7 +61,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
             {
                 var accountId = TDAmeritradeBrokerageFactory.Configuration.AccountID;
 
-                var brokerage = new TDAmeritradeBrokerage(null, null, null, accountId);
+                var brokerage = new TDAmeritradeBrokerage(null, null, null, accountId, tdCredentials: new DefaultTDCredentials());
 
                 var historyProvider = new BrokerageHistoryProvider();
                 historyProvider.SetBrokerage(brokerage);

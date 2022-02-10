@@ -367,14 +367,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (IsPaperTrading)
                 {
-                    _paperBrokerage.PlaceOrder(order);
+                    if(_paperBrokerage.PlaceOrder(order))
+                    {
+                        order.Status = OrderStatus.Submitted;
+                    }
+
+                    _orderResultWaiter.Set();
                 }
                 else
                 {
                     _tdAmeritradeClient.AccountsAndTradingApi.PlaceOrderAsync(_accountId, orderStrategy).Wait();
                 }
 
-                order.Status = OrderStatus.Submitted;
+                order = WaitForOrderUpdate(order);
             }
             catch (Exception ex)
             {
@@ -382,8 +387,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 order.Status = OrderStatus.Invalid;
             }
-
-            OnOrderEvent(new OrderEvent(order, order.Time, OrderFee.Zero));
 
             return order.Status == OrderStatus.Submitted;
         }
@@ -403,20 +406,26 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (IsPaperTrading)
                 {
-                    _paperBrokerage.UpdateOrder(order);
+                    if(_paperBrokerage.UpdateOrder(order))
+                    {
+                        order.Status = OrderStatus.UpdateSubmitted;
+                    }
+
+                    _orderResultWaiter.Set();
                 }
                 else
                 {
                     _tdAmeritradeClient.AccountsAndTradingApi.ReplaceOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture), replaceOrder).Wait();
                 }
-                return true;
+
+                order = WaitForOrderUpdate(order);
             }
             catch (Exception ex)
             {
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "UpdateOrderError", ex.Message));
-
-                return false;
             }
+
+            return order.Status == OrderStatus.UpdateSubmitted;
         }
 
         /// <summary>
@@ -426,6 +435,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>True if the request was made for the order to be canceled, false otherwise</returns>
         public override bool CancelOrder(Order order)
         {
+            if (order.Status == OrderStatus.Filled 
+                || order.Status == OrderStatus.Canceled)
+                return false;
+
             Log.Trace($"{nameof(TDAmeritradeBrokerage)}.CancelOrder(): {order}");
 
             try
@@ -434,17 +447,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     if (_paperBrokerage.CancelOrder(order))
                     {
-                        var cancelEvent = new OrderEvent(order, order.Time, OrderFee.Zero);
-                        cancelEvent.Status = OrderStatus.Canceled;
-                        OnOrderEvent(cancelEvent);
+                        order.Status = OrderStatus.Canceled;
                     }
+
+                    _orderResultWaiter.Set();
                 }
                 else
                 {
                     _tdAmeritradeClient.AccountsAndTradingApi.CancelOrderAsync(_accountId, long.Parse(order.BrokerId.First(), CultureInfo.InvariantCulture)).Wait();
                 }
 
-                return true;
+                order = WaitForOrderUpdate(order);
+
+                return order.Status == OrderStatus.Canceled;
             }
             catch (Exception ex)
             {
@@ -452,6 +467,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 return false;
             }
+        }
+
+        private Order WaitForOrderUpdate(Order order)
+        {
+            _orderResultWaiter.WaitOne();
+            order = _orderProvider.GetOrderById(order.Id);
+            _orderResultWaiter.Reset();
+            return order;
         }
 
         /// <summary>
@@ -482,6 +505,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         public override void Dispose()
         {
+            _tdAmeritradeClient?.LiveMarketDataStreamer.LogoutAsync();
             _orderFillTimer.DisposeSafely();
             if (IsPaperTrading)
             {

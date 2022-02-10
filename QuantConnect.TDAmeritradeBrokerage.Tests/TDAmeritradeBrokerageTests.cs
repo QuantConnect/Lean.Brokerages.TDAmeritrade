@@ -44,45 +44,10 @@ using QuantConnect.Lean.Engine.HistoricalData;
 namespace QuantConnect.TDAmeritradeDownloader.Tests
 {
     [TestFixture]
-    public partial class TDAmeritradeBrokerageTests : BrokerageTests, ICredentials
+    public partial class TDAmeritradeBrokerageTests : BrokerageTests
     {
         protected override Symbol Symbol { get => Symbol.Create("SPY", SecurityType.Equity, Market.USA); }
         protected override SecurityType SecurityType { get => Symbol.SecurityType; }
-
-        /// <summary>
-        /// TD User name
-        /// </summary>
-        /// <returns></returns>
-        public string GetUserName()
-        {
-            string username = "";
-
-            return username;
-        }
-
-        /// <summary>
-        /// TD password
-        /// </summary>
-        /// <returns></returns>
-        public string GetPassword()
-        {
-            //Add breakpoint for live edit
-            string password = "";
-
-            return password;
-        }
-
-        /// <summary>
-        /// TD multi-factor auth code
-        /// </summary>
-        /// <returns></returns>
-        public string GetSmsCode()
-        {
-            //Add breakpoint for live edit
-            string smsCode = "";
-
-            return smsCode;
-        }
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
@@ -94,7 +59,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
 
             var exchangeHours = marketHoursDatabase.GetExchangeHours(Market.USA, Symbol, SecurityType.Equity);
 
-            if (!exchangeHours.IsOpen(DateTime.Now, false))
+            if (!exchangeHours.IsOpen(DateTime.Now, true))
                 throw new NotSupportedException("Market is currently closed.");
 
             var synchronizer = new LiveSynchronizer();
@@ -106,7 +71,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
             var orderProcessor = new TestOrderProcessor(OrderProvider, algorithm.Transactions);
             algorithm.Transactions.SetOrderProcessor(orderProcessor);
 
-            var tdBrokerage = new TDAmeritradeBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio, TDAmeritradeBrokerageFactory.Configuration.AccountID, tdCredentials: this, paperTrade: true);
+            var tdBrokerage = new TDAmeritradeBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio, TDAmeritradeBrokerageFactory.Configuration.AccountID, tdCredentials: new DefaultTDCredentials(), paperTrade: true);
             tdBrokerage.Connect();
             tdBrokerage.SetJob(job);
 
@@ -182,7 +147,7 @@ namespace QuantConnect.TDAmeritradeDownloader.Tests
 
         protected override bool IsAsync()
         {
-            return true;
+            return false;
         }
 
         protected override decimal GetAskPrice(Symbol symbol)

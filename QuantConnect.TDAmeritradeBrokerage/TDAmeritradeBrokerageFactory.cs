@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.IO;
 using System.Collections.Generic;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
@@ -40,7 +41,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             internal static readonly string AccountIDConfigFileKey = "tda-account-id";
             internal static readonly string ConsumerKeyConfigFileKey = "tda-consumer-key";
             internal static readonly string CallbackUrlConfigFileKey = "tda-callback-url";
+            internal static readonly string IsPaperTradingConfigFileKey = "tda-paper-trading";
             internal static readonly string CredentialsProviderConfigFileKey = "tda-credentials-provider";
+            internal static readonly string SavedTokenDirectoryConfigFileKey = "tda-saved-token-directory";
 
             /// <summary>
             /// Gets the account ID to be used when instantiating a brokerage
@@ -53,6 +56,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             public static string ConsumerKey => Config.Get(ConsumerKeyConfigFileKey);
 
             public static string CallbackUrl => Config.Get(CallbackUrlConfigFileKey);
+
+            public static bool IsPaperTrading => Config.GetBool(IsPaperTradingConfigFileKey);
+
+            public static string SavedTokenDirectory => Config.Get(SavedTokenDirectoryConfigFileKey, Directory.GetCurrentDirectory());
 
             public static ICredentials Credentials => Composer.Instance.GetExportedValueByTypeName<ICredentials>(Config.Get(CredentialsProviderConfigFileKey, typeof(TDCliCredentialProvider).FullName));
         }
@@ -81,6 +88,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     { Configuration.AccountIDConfigFileKey, Configuration.AccountID.ToStringInvariant() },
                     { Configuration.ConsumerKeyConfigFileKey, Configuration.ConsumerKey.ToStringInvariant() },
                     { Configuration.CallbackUrlConfigFileKey, Configuration.CallbackUrl.ToStringInvariant() },
+                    { Configuration.IsPaperTradingConfigFileKey, Configuration.IsPaperTrading.ToStringInvariant() },
+                    { Configuration.SavedTokenDirectoryConfigFileKey, Configuration.SavedTokenDirectory.ToStringInvariant() },
                 };
                 return data;
             }
@@ -104,6 +113,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var accountId = Read<string>(job.BrokerageData, Configuration.AccountIDConfigFileKey, errors);
             var clientId = Read<string>(job.BrokerageData, Configuration.ConsumerKeyConfigFileKey, errors);
             var redirectUri = Read<string>(job.BrokerageData, Configuration.CallbackUrlConfigFileKey, errors);
+            bool isPaperTrading = Read<bool>(job.BrokerageData, Configuration.IsPaperTradingConfigFileKey, errors);
+            var savedTokenDirectory = Read<string>(job.BrokerageData, Configuration.SavedTokenDirectoryConfigFileKey, errors);
 
 #pragma warning disable CA2000 // Dispose objects before losing scope
             var tdBrokerage = new TDAmeritradeBrokerage(
@@ -112,7 +123,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 algorithm.Portfolio,
                 accountId,
                 clientId,
-                redirectUri);
+                redirectUri,
+                isPaperTrading,
+                savedTokenDirectory
+                );
 #pragma warning restore CA2000 // Dispose objects before losing scope
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.

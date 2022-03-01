@@ -18,6 +18,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -55,6 +56,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     [BrokerageFactory(typeof(TDAmeritradeBrokerageFactory))]
     public partial class TDAmeritradeBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider, IHistoryProvider, IOptionChainProvider
     {
+        private const string DefaultLinuxPath = "/Lean/Launcher/bin/Debug/";
         private string _accountId;
         private static readonly object _apiClientLock = new();
         private static readonly RateGate _nonOrderRateGate = new(1, TimeSpan.FromSeconds(1)); //  personal use non-commercial applications
@@ -100,12 +102,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string accountId = null,
             string clientId = null,
             string redirectUri = null,
-            ICredentials tdCredentials = null,
-            bool paperTrade = false)
+            bool? paperTrade = null,
+            string tokenSaveDirectory = null,
+            ICredentials tdCredentials = null)
             : base("TD Ameritrade Brokerage")
         {
             _algorithm = algorithm;
-            _paperTrade = paperTrade;
+            _paperTrade = paperTrade.GetValueOrDefault();
             _orderProvider = orderProvider;
             _securityProvider = securityProvider;
             _aggregator = Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"));
@@ -113,7 +116,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
             _subscriptionManager.SubscribeImpl += Subscribe;
             _subscriptionManager.UnsubscribeImpl += Unsubscribe;
-            InitializeClient(clientId, redirectUri, tdCredentials);
+            InitializeClient(clientId, redirectUri, tdCredentials, tokenSaveDirectory);
 
             DetermineOrValidateAccount(accountId).Wait();
         }
@@ -180,7 +183,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="clientId">This is the consumer key that is generated in MyApps</param>
         /// <param name="redirectUri">This is the callback url that is defined in MyApps</param>
         /// <param name="tdCredentials">Callback interface for supplying username, password, and multi-factor authorization code</param>
-        public static void InitializeClient(string clientId = null, string redirectUri = null, ICredentials tdCredentials = null)
+        public static void InitializeClient(string clientId = null, string redirectUri = null, ICredentials tdCredentials = null, string tokenSaveDirectory = null)
         {
             lock (_apiClientLock)
             {
@@ -192,8 +195,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         clientId = TDAmeritradeBrokerageFactory.Configuration.ConsumerKey;
                     if (redirectUri is null)
                         redirectUri = TDAmeritradeBrokerageFactory.Configuration.CallbackUrl;
+                    if (tokenSaveDirectory is null)
+                        tokenSaveDirectory = TDAmeritradeBrokerageFactory.Configuration.SavedTokenDirectory;
 
-                    _tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri);
+                    _tdAmeritradeClient = new TDAmeritradeClient(clientId, redirectUri, tokenSaveDirectory);
 
                     _tdAmeritradeClient.LogIn(tdCredentials).Wait();
                 }
@@ -260,7 +265,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public MarketQuote GetMarketQuote(Symbol symbol)
         {
-            if(_nonOrderRateGate.IsRateLimited)
+            if (_nonOrderRateGate.IsRateLimited)
             {
                 _nonOrderRateGate.WaitToProceed();
             }
@@ -329,10 +334,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>The current cash balance for each currency available for trading</returns>
         public override List<CashAmount> GetCashBalance()
         {
-            return new List<CashAmount>
+            if (_paperTrade)
             {
-                new CashAmount(GetCurrentCashBalance(), AccountBaseCurrency)
-            };
+                return _paperBrokerage.GetCashBalance();
+            }
+            else
+            {
+                return new List<CashAmount>
+                {
+                    new CashAmount(GetCurrentCashBalance(), AccountBaseCurrency)
+                };
+            }
         }
 
         /// <summary>
@@ -367,7 +379,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (IsPaperTrading)
                 {
-                    if(_paperBrokerage.PlaceOrder(order))
+                    if (_paperBrokerage.PlaceOrder(order))
                     {
                         order.Status = OrderStatus.Submitted;
                     }
@@ -406,7 +418,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (IsPaperTrading)
                 {
-                    if(_paperBrokerage.UpdateOrder(order))
+                    if (_paperBrokerage.UpdateOrder(order))
                     {
                         order.Status = OrderStatus.UpdateSubmitted;
                     }
@@ -435,7 +447,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>True if the request was made for the order to be canceled, false otherwise</returns>
         public override bool CancelOrder(Order order)
         {
-            if (order.Status == OrderStatus.Filled 
+            if (order.Status == OrderStatus.Filled
                 || order.Status == OrderStatus.Canceled)
                 return false;
 

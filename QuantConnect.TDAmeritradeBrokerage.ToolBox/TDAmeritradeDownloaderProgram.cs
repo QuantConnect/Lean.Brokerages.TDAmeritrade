@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using QuantConnect.Brokerages.TDAmeritrade;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
@@ -39,31 +40,39 @@ namespace QuantConnect.TDAmeritradeDownloader.ToolBox
                 Environment.Exit(1);
             }
 
-            try
+            bool retry = true;
+
+            while (retry)
             {
-                var castResolution = (Resolution)Enum.Parse(typeof(Resolution), resolution);
-                var castSecurityType = (SecurityType)Enum.Parse(typeof(SecurityType), securityType);
-
-                // Load settings from config.json and create downloader
-                var dataDirectory = Config.Get("data-directory", "../../../Data");
-
-                var downloader = new TDAmeritradeBrokerageDownloader();
-                var symbolMapper = new TDAmeritradeSymbolMapper();
-
-                foreach (var ticker in tickers)
+                try
                 {
-                    // Download data
-                    var pairObject = symbolMapper.GetLeanSymbol(ticker, castSecurityType, Market.USA);
-                    var data = downloader.Get(new DataDownloaderGetParameters(pairObject, castResolution, startDate, endDate));
+                    var castResolution = (Resolution)Enum.Parse(typeof(Resolution), resolution);
+                    var castSecurityType = (SecurityType)Enum.Parse(typeof(SecurityType), securityType);
 
-                    // Write data
-                    var writer = new LeanDataWriter(castResolution, pairObject, dataDirectory);
-                    writer.Write(data);
+                    // Load settings from config.json and create downloader
+                    var dataDirectory = Config.Get("data-directory", "../../../Data");
+
+                    var downloader = new TDAmeritradeBrokerageDownloader();
+                    var symbolMapper = new TDAmeritradeSymbolMapper();
+
+                    foreach (var ticker in tickers)
+                    {
+                        // Download data
+                        var pairObject = symbolMapper.GetLeanSymbol(ticker, castSecurityType, Market.USA);
+                        var data = downloader.Get(new DataDownloaderGetParameters(pairObject, castResolution, startDate, endDate));
+
+                        // Write data
+                        var writer = new LeanDataWriter(castResolution, pairObject, dataDirectory);
+                        writer.Write(data);
+                    }
+
+                    retry = false;
                 }
-            }
-            catch (Exception err)
-            {
-                Log.Error(err);
+                catch (Exception err)
+                {
+                    Log.Error(err);
+                    Task.Delay(1200).Wait();
+                }
             }
 
         }

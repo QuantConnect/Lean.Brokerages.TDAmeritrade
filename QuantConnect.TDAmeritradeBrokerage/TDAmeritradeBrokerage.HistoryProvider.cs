@@ -143,8 +143,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 throw new ArgumentException("Invalid date range specified");
             }
 
-            var start = startDate;//.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork);
-            var end = endDate;//.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork);
+            var start = startDate.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork).Date;
+            var end = endDate.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork);
 
             var history = Enumerable.Empty<TradeBar>();
 

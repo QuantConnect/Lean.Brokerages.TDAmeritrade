@@ -1,4 +1,5 @@
-﻿using QuantConnect.Brokerages.Paper;
+﻿using Newtonsoft.Json;
+using QuantConnect.Brokerages.Paper;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Orders;
@@ -19,13 +20,27 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly IAlgorithm _algorithm;
         private readonly Brokerage _brokerage;
 
-        public BrokerageAssistedPaperBrokerage(IAlgorithm algorithm, Brokerage brokerage, LiveNodePacket job)
+        public BrokerageAssistedPaperBrokerage(IAlgorithm algorithm, Brokerage brokerage, LiveNodePacket job, Func<List<CashAmount>> getBrokerageCashBalance = null)
             : base("Brokerage-Assisted Paper Brokerage")
         {
+            if(!job.BrokerageData.ContainsKey("live-cash-balance"))
+            {
+                job.BrokerageData.Add("live-cash-balance",
+                    getBrokerageCashBalance != null ?
+                    ConvertToJson(getBrokerageCashBalance()) : "[{Amount:100000000, Currency=USD'}]");
+            }
+
             _paperBrokerage = new PaperBrokerage(algorithm, job);
             _algorithm = algorithm;
             _brokerage = brokerage;
             _paperBrokerage.OrderStatusChanged += (sender, e) => OnOrderEvent(e);
+        }
+
+        private static string ConvertToJson(List<CashAmount> cashAmounts)
+        {
+            var result = JsonConvert.SerializeObject(cashAmounts);
+
+            return result;
         }
 
         public override bool IsConnected => _brokerage.IsConnected;
@@ -54,9 +69,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var paper = _paperBrokerage.GetCashBalance();
 
-            var live = _brokerage.GetCashBalance();
-
-            return paper.Concat(live).ToList();
+            return paper;
         }
 
         public override List<Order> GetOpenOrders()

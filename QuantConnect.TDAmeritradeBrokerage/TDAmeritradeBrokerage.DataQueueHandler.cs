@@ -30,6 +30,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
+using QuantConnect.Securities;
 using RestSharp;
 using TDAmeritradeApi.Client.Models.MarketData;
 using TDAmeritradeApi.Client.Models.Streamer;
@@ -55,7 +56,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if (_paperTrade && _paperBrokerage is null)
             {
-                _paperBrokerage = new(_algorithm, this, job);
+                _paperBrokerage = new(_algorithm, this, job, () =>
+                {
+                    return new List<CashAmount>
+                    {
+                        new CashAmount(GetCurrentCashBalance(), AccountBaseCurrency)
+                    };
+                });
                 _paperBrokerage.OrderStatusChanged += (sender, e) => 
                 { 
                     OnOrderEvent(e);

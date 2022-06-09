@@ -271,7 +271,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             if (tradeBars == null || !tradeBars.Any())
                 return Enumerable.Empty<Slice>();
 
-            return tradeBars.Select(tradeBar => new Slice(tradeBar.EndTime, new[] { tradeBar }));
+            return tradeBars.Select(tradeBar => new Slice(tradeBar.EndTime, new[] { tradeBar }, tradeBar.EndTime.ToUniversalTime()));
         }
 
         /// <summary>

@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage", "QuantConnect.TemplateBrokerage\QuantConnect.TemplateBrokerage.csproj", "{7C447DDD-D30D-46C3-A341-2D768CCEEC10}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TDAmeritradeBrokerage", "QuantConnect.TDAmeritradeBrokerage\QuantConnect.TDAmeritradeBrokerage.csproj", "{7C447DDD-D30D-46C3-A341-2D768CCEEC10}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect", "..\Lean\Common\QuantConnect.csproj", "{477827EE-5908-48AB-B6A4-DAB6E85D96DF}"
 EndProject
@@ -15,9 +15,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Brokerages", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Tests", "..\Lean\Tests\QuantConnect.Tests.csproj", "{40B784EE-9297-4715-8C8F-829DFE858BEF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage.Tests", "QuantConnect.TemplateBrokerage.Tests\QuantConnect.TemplateBrokerage.Tests.csproj", "{8793CDDF-3348-473F-98AF-68C6EBFA5014}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TDAmeritradeBrokerage.Tests", "QuantConnect.TDAmeritradeBrokerage.Tests\QuantConnect.TDAmeritradeBrokerage.Tests.csproj", "{8793CDDF-3348-473F-98AF-68C6EBFA5014}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TemplateBrokerage.ToolBox", "QuantConnect.TemplateBrokerage.ToolBox\QuantConnect.TemplateBrokerage.ToolBox.csproj", "{1AB073F2-6881-48C3-AC07-A042D0B51E6B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TDAmeritradeBrokerage.ToolBox", "QuantConnect.TDAmeritradeBrokerage.ToolBox\QuantConnect.TDAmeritradeBrokerage.ToolBox.csproj", "{1AB073F2-6881-48C3-AC07-A042D0B51E6B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

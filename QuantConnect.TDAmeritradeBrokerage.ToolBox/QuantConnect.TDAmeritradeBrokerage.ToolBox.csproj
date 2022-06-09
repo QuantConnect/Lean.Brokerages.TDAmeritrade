@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+
+        <IsPackable>false</IsPackable>
+        <Copyright>Copyright ©  2021</Copyright>
+        <OutputPath>bin\$(Configuration)\</OutputPath>
+        <Product>QuantConnect.TDAmeritradeDownloader.ToolBox</Product>
+        <AssemblyName>QuantConnect.TDAmeritradeDownloader.ToolBox</AssemblyName>
+        <RootNamespace>QuantConnect.TDAmeritradeDownloader.ToolBox</RootNamespace>
+        <AssemblyTitle>QuantConnect.TDAmeritradeDownloader.ToolBox</AssemblyTitle>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Lean\Common\QuantConnect.csproj" />
+      <ProjectReference Include="..\..\Lean\Configuration\QuantConnect.Configuration.csproj" />
+      <ProjectReference Include="..\..\Lean\ToolBox\QuantConnect.ToolBox.csproj" />
+      <ProjectReference Include="..\QuantConnect.TDAmeritradeBrokerage\QuantConnect.TDAmeritradeBrokerage.csproj" />
+    </ItemGroup>
+
+</Project>

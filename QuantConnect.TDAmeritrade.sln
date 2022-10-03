@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31205.134
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.TemplateBrokerage", "QuantConnect.TemplateBrokerage\QuantConnect.TemplateBrokerage.csproj", "{7C447DDD-D30D-46C3-A341-2D768CCEEC10}"
 EndProject
@@ -20,6 +20,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.TemplateBrokerage.ToolBox", "QuantConnect.TemplateBrokerage.ToolBox\QuantConnect.TemplateBrokerage.ToolBox.csproj", "{1AB073F2-6881-48C3-AC07-A042D0B51E6B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantConnect.ToolBox", "..\Lean\ToolBox\QuantConnect.ToolBox.csproj", "{88885A3A-5028-4EFB-9244-47FDB04725CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TDAmeritrade", "QuantConnect.TDAmeritrade\QuantConnect.TDAmeritrade.csproj", "{3B0745DB-3E41-41F9-B5BF-888E9564DF6B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.TDAmeritrade.Tests", "QuantConnect.TDAmeritrade.Tests\QuantConnect.TDAmeritrade.Tests.csproj", "{1E5A5723-BC74-45B2-B529-51D1A47CE1A0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,6 +67,14 @@ Global
 		{88885A3A-5028-4EFB-9244-47FDB04725CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{88885A3A-5028-4EFB-9244-47FDB04725CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{88885A3A-5028-4EFB-9244-47FDB04725CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B0745DB-3E41-41F9-B5BF-888E9564DF6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B0745DB-3E41-41F9-B5BF-888E9564DF6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B0745DB-3E41-41F9-B5BF-888E9564DF6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B0745DB-3E41-41F9-B5BF-888E9564DF6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E5A5723-BC74-45B2-B529-51D1A47CE1A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E5A5723-BC74-45B2-B529-51D1A47CE1A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E5A5723-BC74-45B2-B529-51D1A47CE1A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E5A5723-BC74-45B2-B529-51D1A47CE1A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

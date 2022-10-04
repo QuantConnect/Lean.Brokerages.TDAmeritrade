@@ -33,7 +33,7 @@ namespace QuantConnect.TDAmeritrade.Application
 
             var consumerKey = Read<string>(job.BrokerageData, "tdameritrade-consumer-key", errors);
 
-            var brokerage = new TDAmeritrade(consumerKey);
+            var brokerage = new TDAmeritrade(consumerKey, algorithm);
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

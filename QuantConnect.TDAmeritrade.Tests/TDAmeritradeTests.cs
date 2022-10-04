@@ -10,7 +10,7 @@ namespace QuantConnect.TDAmeritrade.Tests
         private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey);
+        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -38,7 +38,7 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.IsNotEmpty(instrument.Exchange);
             Assert.IsNotEmpty(instrument.AssetType);
 
-            if(instrument.Fundamental != null)
+            if (instrument.Fundamental != null)
             {
                 Assert.IsNotEmpty(instrument.Fundamental.Symbol);
                 Assert.Greater(instrument.Fundamental.High52, 0);
@@ -86,6 +86,16 @@ namespace QuantConnect.TDAmeritrade.Tests
                 Assert.Greater(instrument.Fundamental.Vol10DayAvg, 0);
                 Assert.Greater(instrument.Fundamental.Vol3MonthAvg, 0);
             }
+        }
+
+        [TestCase("AAPL")]
+        public void GetPriceHistory(string ticker)
+        {
+            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
+
+            var history = _brokerage.GetPriceHistory(symbol);
+
+            Assert.IsNotNull(history);
         }
     }
 }

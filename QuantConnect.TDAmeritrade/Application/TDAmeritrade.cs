@@ -6,7 +6,9 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
+using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
+using QuantConnect.TDAmeritrade.Utils.Extensions;
 using RestSharp;
 
 namespace QuantConnect.TDAmeritrade.Application
@@ -174,15 +176,20 @@ namespace QuantConnect.TDAmeritrade.Application
             return instrumentResponse.First();
         }
 
-        public InstrumentModel GetSearchInstruments(string symbol, string projection = "symbol-search")
+        public InstrumentFundamentalModel GetSearchInstruments(string symbol, ProjectionType projectionType = ProjectionType.SymbolSearch)
         {
             var request = new RestRequest("instruments", Method.GET);
 
             request.AddQueryParameter("apikey", _consumerKey);
             request.AddQueryParameter("symbol", symbol);
-            request.AddQueryParameter("projection", projection);
+            request.AddQueryParameter("projection", projectionType.GetProjectionTypeInRequestFormat());
 
-            var instrumentResponse = Execute<InstrumentModel>(request, symbol);
+            var instrumentResponse = projectionType switch
+            {
+                ProjectionType.SymbolSearch => Execute<InstrumentFundamentalModel>(request, symbol),
+                ProjectionType.Fundamental => Execute<InstrumentFundamentalModel>(request, symbol)
+            };
+
             return instrumentResponse;
         }
 

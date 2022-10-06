@@ -9,6 +9,8 @@ namespace QuantConnect.TDAmeritrade.Application
 {
     public partial class TDAmeritrade
     {
+        #region GET
+
         public InstrumentModel GetInstrumentByCUSIP(string cusip)
         {
             var request = new RestRequest($"instruments/{cusip}", Method.GET);
@@ -120,6 +122,41 @@ namespace QuantConnect.TDAmeritrade.Application
 
             return qutes;
         }
+
+        #endregion
+
+        #region POST
+
+        /// <summary>
+        /// The token endpoint returns an access token along with an optional refresh token.
+        /// </summary>
+        public AccessTokenModel PostAccessToken(GrantType grantType)
+        {
+            var request = new RestRequest("oauth2/token", Method.POST);
+
+            request.AddParameter("grant_type", grantType.GetEnumMemberValue(), ParameterType.RequestBody);
+
+            if (grantType == GrantType.RefreshToken)
+                request.AddParameter("refresh_token", _refreshToken, ParameterType.RequestBody);
+
+            if (grantType == GrantType.AuthorizationCode)
+                request.AddParameter("access_type", "offline", ParameterType.RequestBody);
+
+            if (grantType == GrantType.AuthorizationCode)
+                request.AddParameter("code", "", ParameterType.RequestBody); // TODO: How we shall automatizate it ? code after auth in TD Ameritrade broker account;
+
+            request.AddParameter("client_id", _consumerKey, ParameterType.RequestBody);
+
+            if (grantType == GrantType.AuthorizationCode)
+                request.AddParameter("redirect_uri", "https://127.0.0.1:8080");
+
+            var accessTokenModel = Execute<AccessTokenModel>(request);
+
+            return accessTokenModel;
+        }
+
+        #endregion
+
 
         #region TDAmeritrade Helpers
 

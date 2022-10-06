@@ -2,5 +2,7 @@
   "data-folder": "../../../../../Lean/Data/",
   "data-directory": "../../../../../Lean/Data/",
 
-  "tdameritrade-consumer-key": ""
+  "tdameritrade-consumer-key": "",
+  "tdameritrade-access-token": "",
+  "tdameritrade-refresh-token": ""
 }

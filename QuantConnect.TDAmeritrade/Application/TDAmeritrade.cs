@@ -13,25 +13,28 @@ namespace QuantConnect.TDAmeritrade.Application
     [BrokerageFactory(typeof(TDAmeritrade))]
     public partial class TDAmeritrade : BaseWebsocketsBrokerage, IDataQueueHandler
     {
+        private string _accessToken;
         private readonly string _consumerKey;
+        private readonly string _refreshToken;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
-        private string _authApiUrl = "https://auth.tdameritrade.com/auth"; // https://developer.tdameritrade.com/content/authentication-faq
+
+        private IRestClient _restClient;
+        private IAlgorithm _algorithm;
 
         private readonly object _lockAccessCredentials = new object();
 
         public override bool IsConnected => throw new NotImplementedException();
 
-        private IRestClient _restClient;
-        private IAlgorithm _algorithm;
-
         public TDAmeritrade() : base("TD Ameritrade")
         { }
 
-        public TDAmeritrade(string consumerKey, IAlgorithm algorithm) : base("TD Ameritrade")
+        public TDAmeritrade(string consumerKey, string accessToken, string refreshToken, IAlgorithm algorithm) : base("TD Ameritrade")
         {
             _restClient = new RestClient(_restApiUrl);
             _consumerKey = consumerKey;
+            _accessToken = accessToken;
+            _refreshToken = refreshToken;
             _algorithm = algorithm;
 
             //ValidateSubscription(); // Quant Connect api permission

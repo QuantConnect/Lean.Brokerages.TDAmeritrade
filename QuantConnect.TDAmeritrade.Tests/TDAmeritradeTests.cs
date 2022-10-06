@@ -12,9 +12,11 @@ namespace QuantConnect.TDAmeritrade.Tests
         private Application.TDAmeritrade _brokerage;
 
         private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
+        private readonly string _accessToken = Config.Get("tdameritrade-access-token");
+        private readonly string _refreshToken = Config.Get("tdameritrade-refresh-token");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, null);
+        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _accessToken, _refreshToken, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -156,6 +158,15 @@ namespace QuantConnect.TDAmeritrade.Tests
             var quoteData = _brokerage.GetQuotes(symbol1, symbol2);
 
             Assert.AreEqual(2, quoteData.Count());
+        }
+
+        [Test]
+        public void UpdateAccessTokenByRefreshToken()
+        {
+            var tokenModel = _brokerage.PostAccessToken(GrantType.RefreshToken);
+
+            Assert.IsNotNull(tokenModel);
+            Assert.IsNotEmpty(tokenModel.AccessToken);
         }
 
     }

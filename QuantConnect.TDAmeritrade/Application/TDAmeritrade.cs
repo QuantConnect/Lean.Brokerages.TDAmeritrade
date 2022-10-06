@@ -216,7 +216,8 @@ namespace QuantConnect.TDAmeritrade.Application
             ///frequencyType: min
             ///</example>
 
-            request.AddQueryParameter("periodType", periodType.GetEnumMemberValue());
+            if(periodType != PeriodType.Day)
+                request.AddQueryParameter("periodType", periodType.GetEnumMemberValue());
 
             if (IsValidPeriodByPeriodType(periodType, period))
                 request.AddQueryParameter("period", period.ToStringInvariant());
@@ -228,10 +229,10 @@ namespace QuantConnect.TDAmeritrade.Application
                 request.AddQueryParameter("frequency", frequency.ToStringInvariant());
 
             if (startDate.HasValue && (endDate.HasValue ? endDate.Value > startDate.Value : true))
-                request.AddQueryParameter("startDate", Time.DateTimeToUnixTimeStampMilliseconds(startDate.Value).ToStringInvariant());
+                request.AddQueryParameter("startDate", Math.Floor(Time.DateTimeToUnixTimeStampMilliseconds(startDate.Value)).ToStringInvariant());
 
             if (endDate.HasValue && (startDate.HasValue ? startDate.Value < endDate.Value : true))
-                request.AddQueryParameter("endDate", Time.DateTimeToUnixTimeStampMilliseconds(endDate.Value).ToStringInvariant());
+                request.AddQueryParameter("endDate", Math.Floor(Time.DateTimeToUnixTimeStampMilliseconds(endDate.Value)).ToStringInvariant());
 
             if (!needExtendedHoursData)
                 request.AddQueryParameter("needExtendedHoursData", needExtendedHoursData.ToStringInvariant());
@@ -394,7 +395,12 @@ namespace QuantConnect.TDAmeritrade.Application
         {
             bool res = frequencyType switch
             {
-                FrequencyType.Minute when frequency == 1 || frequency == 5 || frequency == 10 || frequency == 15 || frequency == 30 => true,
+                FrequencyType.Minute when frequency == 1 
+                    || frequency == 5 
+                    || frequency == 10 
+                    || frequency == 15 
+                    || frequency == 30
+                    || frequency == 60 => true,
                 FrequencyType.Daily when frequency == 1 => true,
                 FrequencyType.Weekly when frequency == 1 => true,
                 FrequencyType.Monthly when frequency == 1 => true,

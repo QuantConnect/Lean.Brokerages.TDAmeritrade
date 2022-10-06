@@ -1,6 +1,9 @@
 ﻿using NodaTime;
 using QuantConnect.Data;
+using QuantConnect.Data.Market;
 using QuantConnect.Logging;
+using QuantConnect.TDAmeritrade.Domain.Enums;
+using QuantConnect.TDAmeritrade.Utils.Extensions;
 
 namespace QuantConnect.TDAmeritrade.Application
 {
@@ -47,56 +50,69 @@ namespace QuantConnect.TDAmeritrade.Application
             var start = request.StartTimeUtc.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork);
             var end = request.EndTimeUtc.ConvertTo(DateTimeZone.Utc, TimeZones.NewYork);
 
+            IEnumerable<BaseData> history = default;
 
-            IEnumerable<BaseData> history;
             switch (request.Resolution)
             {
-                //case Resolution.Tick:
-                //    history = GetHistoryTick(request, start, end);
-                //    break;
-
-                //case Resolution.Second:
-                //    history = GetHistorySecond(request, start, end);
-                //    break;
-
+                case Resolution.Tick:
+                case Resolution.Second:
+                    Log.Error($"TDAmeritrade.GetHistory() doesn't support of resolution {nameof(request.Resolution)}");
+                    break;
                 case Resolution.Minute:
-                    //history = GetHistoryMinute(request, start, end);
+                    history = GetHistory(request, start, end, PeriodType.Day, FrequencyType.Minute);
                     break;
 
                 case Resolution.Hour:
-                    //history = GetHistoryHour(request, start, end);
+                    history = GetHistory(request, start, end, PeriodType.Day, FrequencyType.Minute);
                     break;
 
                 case Resolution.Daily:
-                    //history = GetHistoryDaily(request, start, end);
+                    history = GetHistory(request, start, end, PeriodType.Year, FrequencyType.Daily);
                     break;
 
                 default:
                     throw new ArgumentException("Invalid date range specified");
             }
 
-            //foreach (var bar in history.Where(bar => bar.Time >= request.StartTimeLocal && bar.EndTime <= request.EndTimeLocal))
-            //{
-            //    if (request.ExchangeHours.IsOpen(bar.Time, bar.EndTime, request.IncludeExtendedMarketHours))
-            //    {
-            //        yield return bar;
-            //    }
-            //}
+            foreach (var bar in history.Where(bar => bar.Time >= request.StartTimeLocal && bar.EndTime <= request.EndTimeLocal))
+            {
+                if (request.ExchangeHours.IsOpen(bar.Time, bar.EndTime, request.IncludeExtendedMarketHours))
+                {
+                    yield return bar;
+                }
+            }
         }
 
-        //private IEnumerable<BaseData> GetHistoryMinute(HistoryRequest request, DateTime start, DateTime end)
-        //{
-        //    var symbol = request.Symbol;
-        //    var exchangeTz = request.ExchangeHours.TimeZone;
-        //    var requestedBarSpan = request.Resolution.ToTimeSpan();
-        //    var history = GetTimeSeries(symbol, start, end, TradierTimeSeriesIntervals.OneMinute);
+        private IEnumerable<BaseData> GetHistory(HistoryRequest request, DateTime start, DateTime end, PeriodType periodType, FrequencyType frequencyType)
+        {
+            var symbol = request.Symbol;
+            var exchangeTz = request.ExchangeHours.TimeZone;
+            var requestedBarSpan = request.Resolution.ToTimeSpan();
 
-        //    if (history == null)
-        //    {
-        //        return Enumerable.Empty<BaseData>();
-        //    }
+            var history = GetPriceHistory(
+                symbol, 
+                periodType,
+                frequencyType: frequencyType,
+                frequency: request.Resolution.ResolutionToFrequency(), 
+                startDate: start, 
+                endDate: end);
 
-        //    return history.Select(bar => new TradeBar(bar.Time, symbol, bar.Open, bar.High, bar.Low, bar.Close, bar.Volume, requestedBarSpan));
-        //}
+            if (history == null)
+            {
+                return Enumerable.Empty<BaseData>();
+            }
+
+            return history.Candles.Select(candle => 
+                new TradeBar(
+                    Time.UnixMillisecondTimeStampToDateTime(candle.DateTime), 
+                    symbol, 
+                    candle.Open, 
+                    candle.High, 
+                    candle.Low, 
+                    candle.Close, 
+                    candle.Volume, 
+                    requestedBarSpan
+                 ));
+        }
     }
 }

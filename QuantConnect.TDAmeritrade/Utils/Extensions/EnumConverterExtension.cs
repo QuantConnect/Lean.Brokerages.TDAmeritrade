@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 using QuantConnect.TDAmeritrade.Domain.Enums;
 
 namespace QuantConnect.TDAmeritrade.Utils.Extensions
@@ -28,5 +23,13 @@ namespace QuantConnect.TDAmeritrade.Utils.Extensions
                 ?.GetCustomAttribute<EnumMemberAttribute>(false)
                 ?.Value;
         }
+
+        public static int ResolutionToFrequency(this Resolution resolution) => resolution switch
+        {
+            Resolution.Minute => 1,
+            Resolution.Hour => 60,
+            Resolution.Daily => 1,
+            _ => throw new ArgumentOutOfRangeException(nameof(resolution), $"Not expected Resolution value: {resolution}")
+        };
     }
 }

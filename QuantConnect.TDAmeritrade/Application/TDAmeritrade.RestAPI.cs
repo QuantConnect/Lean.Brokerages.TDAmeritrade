@@ -82,6 +82,45 @@ namespace QuantConnect.TDAmeritrade.Application
             return Execute<CandleListModel>(request);
         }
 
+        // Quotes
+        /// <summary>
+        /// Get quote for a symbol
+        /// </summary>
+        public QuoteTDAmeritradeModel GetQuote(string symbol)
+        {
+            var request = new RestRequest($"marketdata/{symbol}/quotes", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+            return Execute<QuoteTDAmeritradeModel>(request, symbol);
+        }
+
+        /// <summary>
+        /// Get quote for one or more symbols
+        /// </summary>
+        public IEnumerable<QuoteTDAmeritradeModel> GetQuotes(params string[] symbols)
+        {
+            var request = new RestRequest("marketdata/quotes", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+            var symbolsInOneLine = string.Join(",", symbols);
+
+            request.AddQueryParameter("symbol", symbolsInOneLine);
+
+            var jsonResponse = Execute(request);
+
+            var qutes = new List<QuoteTDAmeritradeModel>(symbols.Length);
+
+            foreach (var symbol in symbols)
+            {
+                if (TryDeserializeRemoveRoot(jsonResponse, symbol, out QuoteTDAmeritradeModel result))
+                    qutes.Add(result);
+            }
+
+            return qutes;
+        }
+
         #region TDAmeritrade Helpers
 
         private bool TryDeserializeRemoveRoot<T>(string json, string rootName, out T obj)

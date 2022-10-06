@@ -141,5 +141,22 @@ namespace QuantConnect.TDAmeritrade.Tests
 
         }
 
+        [TestCase("AAPL")] // EQUITY
+        [TestCase("VGHAX")] // MUTUAL_FUND
+        public void GetQuote(string symbol)
+        {
+            var quoteData = _brokerage.GetQuote(symbol);
+
+            Assert.IsNotEmpty(quoteData.Symbol);
+        }
+
+        [TestCase("AAPL", "VGHAX")] // EQUITY, MUTUAL_FUND
+        public void GetQuotes(string symbol1, string symbol2)
+        {
+            var quoteData = _brokerage.GetQuotes(symbol1, symbol2);
+
+            Assert.AreEqual(2, quoteData.Count());
+        }
+
     }
 }

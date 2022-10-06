@@ -39,9 +39,9 @@ namespace QuantConnect.TDAmeritrade.Application
 
         #region TD Ameritrade client
 
-        private T Execute<T>(RestRequest request, /*TradierApiRequestType type,*/ string rootName = "", int attempts = 0, int max = 10) where T : new()
+        private string Execute(RestRequest request, string rootName = "", int attempts = 0, int max = 10)
         {
-            var response = default(T);
+            string response = null;
 
             var method = "TDAmeritrade.Execute." + request.Resource;
             var parameters = request.Parameters.Select(x => x.Name + ": " + x.Value);
@@ -53,12 +53,7 @@ namespace QuantConnect.TDAmeritrade.Application
 
             lock (_lockAccessCredentials)
             {
-                //Wait for the API rate limiting
-                //_rateLimitNextRequest[type].WaitToProceed();
-
-                //Send the request:
                 var raw = _restClient.Execute(request);
-                //_previousResponseRaw = raw.Content;
 
                 if (!raw.IsSuccessful)
                 {
@@ -68,58 +63,29 @@ namespace QuantConnect.TDAmeritrade.Application
                         var fault = JsonConvert.DeserializeObject(raw.Content); // TODO: Develop Deserialzie model
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
 
-                        return default(T);
+                        return string.Empty;
                     }
 
-                    // this happens when we try to cancel a filled or cancelled order
-                    //if (raw.Content.Contains("order already in finalized state:"))
-                    //{
-                    //    if (request.Method == Method.DELETE)
-                    //    {
-                    //        var orderId = raw.ResponseUri.Segments.LastOrDefault() ?? "[unknown]";
-
-                    //        OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, "OrderAlreadyFilledOrCancelled",
-                    //            "Unable to cancel the order because it has already been filled or cancelled. TradierOrderId: " + orderId
-                    //        ));
-                    //    }
-                    //    return default(T);
-                    //}
-
-                    // this happens when a request for historical data should return an empty response
-                    //if (type == TradierApiRequestType.Data && rootName == "series")
-                    //{
-                    //    return new T();
-                    //}
-
                     Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
+
                     if (attempts++ < max)
                     {
                         Log.Trace(method + "(2): Attempting again...");
                         // this will retry on time outs and other transport exception
                         Thread.Sleep(3000);
-                        //return Execute<T>(request, type, rootName, attempts, max);
-                        return Execute<T>(request, rootName, attempts, max);
+                        return Execute(request, rootName, attempts, max);
                     }
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, raw.StatusCode.ToStringInvariant(), raw.Content));
 
-                    return default(T);
+                    return string.Empty;
                 }
 
                 try
                 {
-                    if (!string.IsNullOrEmpty(rootName))
-                    {
-                        if (TryDeserializeRemoveRoot(raw.Content, rootName, out response))
-                        {
-                            // if we are able to successfully deserialize the rootName, even if null, return it. For example if there is no historical data
-                            // tradier will just return success response with null value in 'rootName' and we don't want to retry & sleep because of it
-                            return response;
-                        }
-                    }
-                    else
-                    {
-                        response = JsonConvert.DeserializeObject<T>(raw.Content);
-                    }
+                    if (!string.IsNullOrEmpty(raw.Content))
+                        return raw.Content;
+
+                    response = null;
                 }
                 catch (Exception e)
                 {
@@ -133,8 +99,7 @@ namespace QuantConnect.TDAmeritrade.Application
                         Log.Trace(method + "(3): Attempting again...");
                         // this will retry on time outs and other transport exception
                         Thread.Sleep(3000);
-                        //return Execute<T>(request, type, rootName, attempts, max);
-                        return Execute<T>(request, rootName, attempts, max);
+                        return Execute(request, rootName, attempts, max);
                     }
 
                     Log.Trace(method + "(3): Parameters: " + string.Join(",", parameters));
@@ -153,12 +118,43 @@ namespace QuantConnect.TDAmeritrade.Application
                     // this will retry on time outs and other transport exception
                     Thread.Sleep(3000);
                     //return Execute<T>(request, type, rootName, attempts, max);
-                    return Execute<T>(request, rootName, attempts, max);
+                    return Execute(request, rootName, attempts, max);
                 }
 
                 Log.Trace(method + "(4): Parameters: " + string.Join(",", parameters));
                 Log.Error(method + "(4): null response: raw response: " + "_previousresponseraw");
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, "NullResponse", "_previousResponseRaw"));
+            }
+
+            return response;
+        }
+
+        private T Execute<T>(RestRequest request, string rootName = "", int attempts = 0, int max = 10) where T : new()
+        {
+            var response = default(T);
+
+            var raw = Execute(request, rootName, attempts, max);
+
+            if (raw == null)
+                return response;
+
+            try
+            {
+                if (!string.IsNullOrEmpty(rootName))
+                {
+                    if (TryDeserializeRemoveRoot(raw, rootName, out response))
+                    {
+                        return response;
+                    }
+                }
+                else
+                {
+                    response = JsonConvert.DeserializeObject<T>(raw);
+                }
+            }
+            catch (Exception e)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw} Error: {e.Message}"));
             }
 
             return response;

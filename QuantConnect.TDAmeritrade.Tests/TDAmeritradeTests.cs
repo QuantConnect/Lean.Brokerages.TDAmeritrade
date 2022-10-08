@@ -12,11 +12,12 @@ namespace QuantConnect.TDAmeritrade.Tests
         private Application.TDAmeritrade _brokerage;
 
         private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
-        private readonly string _accessToken = Config.Get("tdameritrade-access-token");
+        private readonly string _callbackUrl = Config.Get("tdameritrade-callback-url");
+        private readonly string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
         private readonly string _refreshToken = Config.Get("tdameritrade-refresh-token");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _accessToken, _refreshToken, null);
+        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -157,16 +158,53 @@ namespace QuantConnect.TDAmeritrade.Tests
         {
             var quoteData = _brokerage.GetQuotes(symbol1, symbol2);
 
-            Assert.AreEqual(2, quoteData.Count());
+            Assert.That(quoteData.Count(), Is.EqualTo(2));
         }
 
         [Test]
-        public void UpdateAccessTokenByRefreshToken()
+        public void GetSignInUrl()
         {
-            var tokenModel = _brokerage.PostAccessToken(GrantType.RefreshToken);
+            string expected = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=http%3a%2f%2flocalhost&client_id={_consumerKey}%40AMER.OAUTHAP";
 
-            Assert.IsNotNull(tokenModel);
-            Assert.IsNotEmpty(tokenModel.AccessToken);
+            var url = _brokerage.GetSignInUrl();
+
+            Assert.IsNotNull(url);
+            Assert.That(url, Is.EqualTo(expected));
+        }
+
+        [Test]
+        public async Task GetRefreshToken()
+        {
+            var res = await _brokerage.PostAccessToken(GrantType.AuthorizationCode, _codeFromUrl);
+
+            Assert.IsNotNull(res);
+        }
+
+        [Test]
+        public async Task UpdateAccessToken()
+        {
+            var res = await _brokerage.PostAccessToken(GrantType.RefreshToken, string.Empty);
+            
+            Assert.IsNotNull(res);
+        }
+
+        [Test]
+        public void GetAccounts()
+        {
+            var res = _brokerage.GetAccounts();
+                
+            Assert.IsNotNull(res);
+            Assert.Greater(res[0].SecuritiesAccount.InitialBalances.CashBalance, 0);
+            Assert.Greater(res[0].SecuritiesAccount.InitialBalances.Equity, 0);
+            Assert.Greater(res[0].SecuritiesAccount.InitialBalances.LongStockValue, 0);
+
+            Assert.Greater(res[0].SecuritiesAccount.CurrentBalances.CashBalance, 0);
+            Assert.Greater(res[0].SecuritiesAccount.CurrentBalances.LiquidationValue, 0);
+            Assert.Greater(res[0].SecuritiesAccount.CurrentBalances.BuyingPowerNonMarginableTrade, 0);
+
+            Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFunds, 0);
+            Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.BuyingPower, 0);
+            Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFundsNonMarginableTrade, 0);
         }
 
     }

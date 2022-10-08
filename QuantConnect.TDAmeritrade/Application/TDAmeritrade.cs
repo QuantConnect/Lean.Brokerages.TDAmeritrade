@@ -6,6 +6,7 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
+using QuantConnect.TDAmeritrade.Domain.Enums;
 using RestSharp;
 
 namespace QuantConnect.TDAmeritrade.Application
@@ -16,6 +17,8 @@ namespace QuantConnect.TDAmeritrade.Application
         private string _accessToken;
         private readonly string _consumerKey;
         private readonly string _refreshToken;
+        private readonly string _callbackUrl;
+        private readonly string _codeFromUrl;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
 
@@ -29,12 +32,18 @@ namespace QuantConnect.TDAmeritrade.Application
         public TDAmeritrade() : base("TD Ameritrade")
         { }
 
-        public TDAmeritrade(string consumerKey, string accessToken, string refreshToken, IAlgorithm algorithm) : base("TD Ameritrade")
+        public TDAmeritrade(
+            string consumerKey, 
+            string refreshToken, 
+            string callbackUrl, 
+            string codeFromUrl, 
+            IAlgorithm algorithm) : base("TD Ameritrade")
         {
             _restClient = new RestClient(_restApiUrl);
             _consumerKey = consumerKey;
-            _accessToken = accessToken;
             _refreshToken = refreshToken;
+            _callbackUrl = callbackUrl;
+            _codeFromUrl = codeFromUrl;
             _algorithm = algorithm;
 
             //ValidateSubscription(); // Quant Connect api permission
@@ -44,6 +53,11 @@ namespace QuantConnect.TDAmeritrade.Application
 
         private string Execute(RestRequest request, string rootName = "", int attempts = 0, int max = 10)
         {
+            if(string.IsNullOrEmpty(_accessToken))
+                Task.Run(() => PostAccessToken(GrantType.RefreshToken, string.Empty)).GetAwaiter().GetResult();
+
+            request.AddHeader("Authorization", _accessToken);
+
             string response = null;
 
             var method = "TDAmeritrade.Execute." + request.Resource;

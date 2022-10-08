@@ -4,6 +4,8 @@ using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
 using QuantConnect.TDAmeritrade.Utils.Extensions;
 using RestSharp;
+using System.Net;
+using System.Web;
 
 namespace QuantConnect.TDAmeritrade.Application
 {
@@ -123,36 +125,97 @@ namespace QuantConnect.TDAmeritrade.Application
             return qutes;
         }
 
+        /// <summary>
+        /// User have to redirect by this url to copy code from url
+        /// </summary>
+        /// <param name="redirectUrl"></param>
+        /// <see href="https://www.reddit.com/r/algotrading/comments/c81vzq/td_ameritrade_api_access_2019_guide/"/>
+        /// <seealso href="https://www.reddit.com/r/algotrading/comments/914q22/successful_access_to_td_ameritrade_api/"/>
+        /// <returns></returns>
+        public string GetSignInUrl(string redirectUrl = "http://localhost")
+        {
+            var encodedKey = HttpUtility.UrlEncode(_consumerKey);
+            var encodedUri = HttpUtility.UrlEncode(redirectUrl);
+            var path = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri={encodedUri}&client_id={encodedKey}%40AMER.OAUTHAP";
+            return path;
+        }
+
+        /// <summary>
+        /// Account balances, positions, and orders for all linked accounts.
+        /// </summary>
+        public List<AccountModel> GetAccounts()
+        {
+            var request = new RestRequest("accounts", Method.GET);
+
+            request.AddQueryParameter("fields", "positions,orders");
+            
+            return Execute<List<AccountModel>>(request);
+        }
+
+        /// <summary>
+        /// Account balances, positions, and orders for a specific account.
+        /// </summary>
+        public List<AccountModel> GetAccount(string accountNumber)
+        {
+            var request = new RestRequest($"accounts/{accountNumber}", Method.GET);
+
+            request.AddQueryParameter("fields", "positions,orders");
+
+            return Execute<List<AccountModel>>(request);
+        }
+
+
         #endregion
 
         #region POST
 
         /// <summary>
+        /// Sign in using code from SignInUrl
         /// The token endpoint returns an access token along with an optional refresh token.
+        /// https://developer.tdameritrade.com/authentication/apis/post/token-0
         /// </summary>
-        public AccessTokenModel PostAccessToken(GrantType grantType)
+        /// <param name="code">Required if trying to use authorization code grant</param>
+        /// <param name="redirectUrl">Required if trying to use authorization code grant</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task<AccessTokenModel> PostAccessToken(GrantType grantType, string code)
         {
-            var request = new RestRequest("oauth2/token", Method.POST);
+            var path = _restApiUrl + "oauth2/token";
 
-            request.AddParameter("grant_type", grantType.GetEnumMemberValue(), ParameterType.RequestBody);
+            using (var client = new HttpClient())
+            {
+                var body = new Dictionary<string, string>();
 
-            if (grantType == GrantType.RefreshToken)
-                request.AddParameter("refresh_token", _refreshToken, ParameterType.RequestBody);
+                body["grant_type"] = grantType.GetEnumMemberValue();
 
-            if (grantType == GrantType.AuthorizationCode)
-                request.AddParameter("access_type", "offline", ParameterType.RequestBody);
+                if (grantType == GrantType.RefreshToken)
+                    body["refresh_token"] = _refreshToken;
 
-            if (grantType == GrantType.AuthorizationCode)
-                request.AddParameter("code", "", ParameterType.RequestBody); // TODO: How we shall automatizate it ? code after auth in TD Ameritrade broker account;
+                if (grantType == GrantType.AuthorizationCode)
+                    body["access_type"] = "offline";
 
-            request.AddParameter("client_id", _consumerKey, ParameterType.RequestBody);
+                if (grantType == GrantType.AuthorizationCode)
+                    body["code"] = HttpUtility.UrlDecode(code);
 
-            if (grantType == GrantType.AuthorizationCode)
-                request.AddParameter("redirect_uri", "https://127.0.0.1:8080");
+                body["client_id"] = _consumerKey + "@AMER.OAUTHAP";
 
-            var accessTokenModel = Execute<AccessTokenModel>(request);
+                if (grantType == GrantType.AuthorizationCode)
+                    body["redirect_uri"] = _callbackUrl;
 
-            return accessTokenModel;
+                var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(body) };
+                var res = await client.SendAsync(req);
+
+                switch (res.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        var accessTokens = JsonConvert.DeserializeObject<AccessTokenModel>(await res.Content.ReadAsStringAsync());
+                        _accessToken = accessTokens.TokenType + " " + accessTokens.AccessToken;
+                        return accessTokens;
+                    default:
+                        Log.Error($"TDAmeritrade.SignIn: StatusCode:{res.StatusCode}, ReasonPhrase:{res.ReasonPhrase}");
+                        throw new Exception($"{res.StatusCode} {res.ReasonPhrase}");
+                }
+            }
         }
 
         #endregion

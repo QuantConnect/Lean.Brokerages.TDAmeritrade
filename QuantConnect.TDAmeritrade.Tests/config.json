@@ -3,6 +3,7 @@
   "data-directory": "../../../../../Lean/Data/",
 
   "tdameritrade-consumer-key": "",
-  "tdameritrade-access-token": "",
+  "tdameritrade-callback-url": "http://localhost",
+  "tdameritrade-code-from-url": "",
   "tdameritrade-refresh-token": ""
 }

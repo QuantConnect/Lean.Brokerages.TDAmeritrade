@@ -7,6 +7,7 @@ using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.TDAmeritrade.Domain.Enums;
+using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
 using RestSharp;
 
 namespace QuantConnect.TDAmeritrade.Application
@@ -56,7 +57,7 @@ namespace QuantConnect.TDAmeritrade.Application
             if(string.IsNullOrEmpty(_accessToken))
                 Task.Run(() => PostAccessToken(GrantType.RefreshToken, string.Empty)).GetAwaiter().GetResult();
 
-            request.AddHeader("Authorization", _accessToken);
+            request.AddOrUpdateHeader("Authorization", _accessToken);
 
             string response = null;
 
@@ -74,13 +75,17 @@ namespace QuantConnect.TDAmeritrade.Application
 
                 if (!raw.IsSuccessful)
                 {
-                    // fault errors on authentication
-                    if (raw.Content.Contains("\"fault\""))
+                    // The API key has invalid
+                    if (raw.Content.Contains("The API key in request query param is either null or blank or invalid"))
                     {
-                        var fault = JsonConvert.DeserializeObject(raw.Content); // TODO: Develop Deserialzie model
+                        var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
 
                         return string.Empty;
+                    }
+                    else if(raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
+                    {
+                        _accessToken = string.Empty;
                     }
 
                     Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
@@ -152,7 +157,7 @@ namespace QuantConnect.TDAmeritrade.Application
 
             var raw = Execute(request, rootName, attempts, max);
 
-            if (raw == null)
+            if (string.IsNullOrEmpty(raw))
                 return response;
 
             try

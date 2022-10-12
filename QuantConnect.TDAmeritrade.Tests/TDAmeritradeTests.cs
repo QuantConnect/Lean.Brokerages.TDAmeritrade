@@ -4,6 +4,7 @@ using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.Securities;
 using NodaTime;
 using QuantConnect.Data.Market;
+using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
 
 namespace QuantConnect.TDAmeritrade.Tests
 {
@@ -15,9 +16,10 @@ namespace QuantConnect.TDAmeritrade.Tests
         private readonly string _callbackUrl = Config.Get("tdameritrade-callback-url");
         private readonly string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
         private readonly string _refreshToken = Config.Get("tdameritrade-refresh-token");
+        private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, null);
+        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -172,6 +174,7 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.That(url, Is.EqualTo(expected));
         }
 
+        [Ignore("You have to update your code from url in config to complete this test, seeAlso: GetSignInUrl() Test")]
         [Test]
         public async Task GetRefreshToken()
         {
@@ -205,6 +208,81 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFunds, 0);
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.BuyingPower, 0);
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFundsNonMarginableTrade, 0);
+        }
+
+        [Test]
+        public void GetOrdersByPath()
+        {
+            var order = _brokerage.GetOrdersByPath().First();
+
+            Assert.IsNotNull(order);
+            Assert.IsNotEmpty(order.Status);
+            Assert.Greater(order.AccountId, 0);
+            Assert.Greater(order.Price, 0);
+            Assert.IsNotEmpty(order.OrderType);
+
+            Assert.IsNotNull(order.OrderLegCollections);
+            Assert.Greater(order.OrderLegCollections[0].Quantity, 0);
+            Assert.Greater(order.OrderLegCollections[0].LegId, 0);
+            Assert.IsNotEmpty(order.OrderLegCollections[0].Instrument.Cusip);
+            Assert.IsNotEmpty(order.OrderLegCollections[0].Instrument.Symbol);
+        }
+
+        [TestCase("9556056706")]
+        public void GetOrdersById(string orderNumber)
+        {
+            var order = _brokerage.GetOrder(orderNumber);
+
+            Assert.IsNotNull(order);
+            Assert.IsNotEmpty(order.Status);
+            Assert.Greater(order.AccountId, 0);
+            Assert.Greater(order.Price, 0);
+            Assert.IsNotEmpty(order.OrderType);
+
+            Assert.IsNotNull(order.OrderLegCollections);
+            Assert.Greater(order.OrderLegCollections[0].Quantity, 0);
+            Assert.Greater(order.OrderLegCollections[0].LegId, 0);
+            Assert.IsNotEmpty(order.OrderLegCollections[0].Instrument.Cusip);
+            Assert.IsNotEmpty(order.OrderLegCollections[0].Instrument.Symbol);
+        }
+
+        [Ignore("Market hasn't completed yet")]
+        [TestCase(OrderType.Market)]
+        public void PostOrderMarket(OrderType orderType)
+        {
+            var session = SessionType.Normal;
+            var duration = DurationType.Day;
+            var orderStrategyType = OrderStrategyType.Single;
+
+            PlaceOrderLegCollectionModel orderLegCollectionModel = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
+            //OrderLegCollectionModel orderLegCollectionModel2 = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
+
+            List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
+            orderLegCollectionModels.Add(orderLegCollectionModel);
+            //orderLegCollectionModels.Add(orderLegCollectionModel2);
+
+            var order = _brokerage.PostPlaceOrder(orderType, session, duration, orderStrategyType, orderLegCollectionModels);
+
+            Assert.IsNotNull(order);
+        }
+
+        [Ignore("Limit hasn't completed yet")]
+        [TestCase(OrderType.Limit, 0.0003)]
+        public void PostOrderLimit(OrderType orderType, decimal price)
+        {
+            var session = SessionType.Normal;
+            var duration = DurationType.Day;
+            var orderStrategyType = OrderStrategyType.Single;
+            var complexOrderStrategyType = ComplexOrderStrategyType.None;
+
+            PlaceOrderLegCollectionModel orderLegCollectionModel = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
+
+            List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
+            orderLegCollectionModels.Add(orderLegCollectionModel);
+
+            var order = _brokerage.PostPlaceOrder(orderType, session, duration, orderStrategyType, orderLegCollectionModels, complexOrderStrategyType, price);
+
+            Assert.IsNotNull(order);
         }
 
     }

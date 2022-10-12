@@ -31,5 +31,21 @@ namespace QuantConnect.TDAmeritrade.Utils.Extensions
             Resolution.Daily => 1,
             _ => throw new ArgumentOutOfRangeException(nameof(resolution), $"Not expected Resolution value: {resolution}")
         };
+
+        public static string GetEnumValue(this Enum value)
+        {
+            // Get the Description attribute value for the enum value
+            var fi = value.GetType().GetField(value.ToString());
+            var attributes = (EnumMemberAttribute[])fi.GetCustomAttributes(typeof(EnumMemberAttribute), false);
+
+            if (attributes.Length > 0)
+            {
+                return attributes[0].Value;
+            }
+            else
+            {
+                return value.ToString();
+            }
+        }
     }
 }

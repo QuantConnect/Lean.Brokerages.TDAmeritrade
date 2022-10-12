@@ -19,7 +19,8 @@ namespace QuantConnect.TDAmeritrade.Application
                     { "tdameritrade-consumer-key", TDAmeritradeConfiguration.ConsumerKey.ToStringInvariant() },
                     { "tdameritrade-callback-url", TDAmeritradeConfiguration.CallbackUrl.ToStringInvariant() },
                     { "tdameritrade-code-from-url", TDAmeritradeConfiguration.AccessToken.ToStringInvariant() },
-                    { "tdameritrade-refresh-token", TDAmeritradeConfiguration.RefreshToken.ToStringInvariant() }
+                    { "tdameritrade-refresh-token", TDAmeritradeConfiguration.RefreshToken.ToStringInvariant() },
+                    { "tdameritrade-account-number", TDAmeritradeConfiguration.AccountNumber.ToStringInvariant() }
                 };
                 return data;
             }
@@ -38,8 +39,9 @@ namespace QuantConnect.TDAmeritrade.Application
             var callback = Read<string>(job.BrokerageData, "tdameritrade-callback-url", errors);
             var codeFromUrl = Read<string>(job.BrokerageData, "tdameritrade-code-from-url", errors);
             var refreshToken = Read<string>(job.BrokerageData, "tdameritrade-refresh-token", errors);
+            var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
-            var brokerage = new TDAmeritrade(consumerKey, refreshToken, callback, codeFromUrl, algorithm);
+            var brokerage = new TDAmeritrade(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm);
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

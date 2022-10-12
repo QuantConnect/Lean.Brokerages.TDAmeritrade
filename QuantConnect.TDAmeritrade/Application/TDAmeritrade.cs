@@ -8,6 +8,7 @@ using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
+using QuantConnect.Util;
 using RestSharp;
 
 namespace QuantConnect.TDAmeritrade.Application
@@ -20,6 +21,7 @@ namespace QuantConnect.TDAmeritrade.Application
         private readonly string _refreshToken;
         private readonly string _callbackUrl;
         private readonly string _codeFromUrl;
+        private readonly string _accountNumber;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
 
@@ -27,6 +29,7 @@ namespace QuantConnect.TDAmeritrade.Application
         private IAlgorithm _algorithm;
 
         private readonly object _lockAccessCredentials = new object();
+        private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
 
         public override bool IsConnected => throw new NotImplementedException();
 
@@ -34,10 +37,11 @@ namespace QuantConnect.TDAmeritrade.Application
         { }
 
         public TDAmeritrade(
-            string consumerKey, 
-            string refreshToken, 
-            string callbackUrl, 
-            string codeFromUrl, 
+            string consumerKey,
+            string refreshToken,
+            string callbackUrl,
+            string codeFromUrl,
+            string accountNumber,
             IAlgorithm algorithm) : base("TD Ameritrade")
         {
             _restClient = new RestClient(_restApiUrl);
@@ -45,6 +49,7 @@ namespace QuantConnect.TDAmeritrade.Application
             _refreshToken = refreshToken;
             _callbackUrl = callbackUrl;
             _codeFromUrl = codeFromUrl;
+            _accountNumber = accountNumber;
             _algorithm = algorithm;
 
             //ValidateSubscription(); // Quant Connect api permission
@@ -130,22 +135,6 @@ namespace QuantConnect.TDAmeritrade.Application
                     const string message = "Error retrieving response.  Check inner details for more info.";
                     throw new ApplicationException(message, raw.ErrorException);
                 }
-            }
-
-            if (response == null)
-            {
-                if (attempts++ < max)
-                {
-                    Log.Trace(method + "(4): Attempting again...");
-                    // this will retry on time outs and other transport exception
-                    Thread.Sleep(3000);
-                    //return Execute<T>(request, type, rootName, attempts, max);
-                    return Execute(request, rootName, attempts, max);
-                }
-
-                Log.Trace(method + "(4): Parameters: " + string.Join(",", parameters));
-                Log.Error(method + "(4): null response: raw response: " + "_previousresponseraw");
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, "NullResponse", "_previousResponseRaw"));
             }
 
             return response;

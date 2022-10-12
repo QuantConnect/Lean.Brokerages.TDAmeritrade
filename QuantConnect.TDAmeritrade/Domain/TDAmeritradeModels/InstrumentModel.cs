@@ -23,5 +23,14 @@ namespace QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels
 
         [JsonProperty(PropertyName = "assetType")]
         public string AssetType { get; set; } = string.Empty;
+
+        public InstrumentModel()
+        { }
+
+        public InstrumentModel(string symbol, string assetType)
+        {
+            Symbol = symbol;
+            AssetType = assetType;
+        }
     }
 }

@@ -164,6 +164,69 @@ namespace QuantConnect.TDAmeritrade.Application
             return Execute<List<AccountModel>>(request);
         }
 
+        /// <summary>
+        /// Orders for a specific account.
+        /// </summary>
+        /// <param name="maxResults">The max number of orders to retrieve.</param>
+        /// <param name="fromEnteredTime">Specifies that no orders entered before this time should be returned. 
+        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
+        /// If 'toEnteredTime' is not sent, the default `toEnteredTime` would be the current day.
+        /// </param>
+        /// <param name="toEnteredTime">Specifies that no orders entered after this time should be returned.
+        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
+        /// If 'fromEnteredTime' is not sent, the default `fromEnteredTime` would be 60 days from `toEnteredTime`.
+        /// </param>
+        /// <param name="orderStatusType">Specifies that only orders of this status should be returned.</param>
+        public IEnumerable<OrderModel> GetOrdersByPath(int maxResults = 1, DateTime? fromEnteredTime = null, DateTime? toEnteredTime = null, OrderStatusType orderStatusType = OrderStatusType.NoValue)
+        {
+            var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.GET);
+
+            return GetOrderByDifferentPath(request, maxResults, fromEnteredTime, toEnteredTime, orderStatusType);
+        }
+
+        /// <summary>
+        /// All orders for a specific account or, if account ID isn't specified, orders will be returned for all linked accounts.
+        /// </summary>
+        /// <param name="accountNumber">Account Number.</param>
+        /// <param name="maxResults">The max number of orders to retrieve.</param>
+        /// <param name="fromEnteredTime">Specifies that no orders entered before this time should be returned. 
+        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
+        /// If 'toEnteredTime' is not sent, the default `toEnteredTime` would be the current day.
+        /// </param>
+        /// <param name="toEnteredTime">Specifies that no orders entered after this time should be returned.
+        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
+        /// If 'fromEnteredTime' is not sent, the default `fromEnteredTime` would be 60 days from `toEnteredTime`.
+        /// </param>
+        /// <param name="orderStatusType">Specifies that only orders of this status should be returned.</param>
+        /// <returns></returns>
+        public IEnumerable<OrderModel> GetOrdersByQuery(
+            string accountNumber,
+            int maxResults = 1, 
+            DateTime? fromEnteredTime = null, 
+            DateTime? toEnteredTime = null, 
+            OrderStatusType orderStatusType = OrderStatusType.NoValue)
+        {
+            var request = new RestRequest($"orders", Method.GET);
+
+            request.AddQueryParameter("accountId", accountNumber);
+
+            return GetOrderByDifferentPath(request, maxResults, fromEnteredTime, toEnteredTime, orderStatusType);
+        }
+
+        /// <summary>
+        /// Get a specific order for a specific account.
+        /// </summary>
+        /// <param name="orderNumber">Order Number</param>
+        /// <param name="accountNumber">Account Number</param>
+        /// <returns></returns>
+        public OrderModel GetOrder(string orderNumber, string accountNumber = null)
+        {
+            var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
+
+            var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.GET);
+
+            return Execute<OrderModel>(request);
+        }
 
         #endregion
 
@@ -216,6 +279,49 @@ namespace QuantConnect.TDAmeritrade.Application
                         throw new Exception($"{res.StatusCode} {res.ReasonPhrase}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Place an order for a specific account.
+        /// </summary>
+        /// <param name="orderType">Market | Limit</param>
+        /// <param name="sessionType">Market | Limit</param>
+        /// <param name="durationType">Market | Limit</param>
+        /// <param name="orderStrategyType">Market | Limit</param>
+        /// <param name="orderLegCollectionModels">Market</param>
+        /// <param name="complexOrderStrategyType">Limit</param>
+        /// <param name="price">Limit</param>
+        /// <returns></returns>
+        public string PostPlaceOrder(
+            OrderType orderType,
+            SessionType sessionType, 
+            DurationType durationType,
+            OrderStrategyType orderStrategyType,
+            List<PlaceOrderLegCollectionModel> orderLegCollectionModels,
+            ComplexOrderStrategyType? complexOrderStrategyType = null,
+            decimal price = 0m)
+        {
+            var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.POST);
+
+            var body = new Dictionary<string, object>();
+
+            if (orderType != OrderType.Market)
+                body["complexOrderStrategyType"] = complexOrderStrategyType.GetEnumValue();
+
+            if (orderType != OrderType.Market)
+                body["price"] = price;
+
+            body["orderType"] = orderType.GetEnumMemberValue();
+            body["session"] = sessionType.GetEnumMemberValue();
+            body["duration"] = durationType.GetEnumMemberValue();
+            body["orderStrategyType"] = orderStrategyType.GetEnumMemberValue();
+            body["orderLegCollection"] = orderLegCollectionModels;
+
+            request.AddJsonBody(JsonConvert.SerializeObject(body));
+
+            var str = Execute(request);
+
+            return str;
         }
 
         #endregion
@@ -330,6 +436,27 @@ namespace QuantConnect.TDAmeritrade.Application
                 Log.Error($"TDAmeritrade.Execute.GetPriceHistory(): current frequency: {frequency} doesn't support by frequencyType: {nameof(frequencyType)}");
 
             return res;
+        }
+
+        private IEnumerable<OrderModel> GetOrderByDifferentPath(
+            RestRequest request,
+            int maxResults = 1,
+            DateTime? fromEnteredTime = null,
+            DateTime? toEnteredTime = null,
+            OrderStatusType orderStatusType = OrderStatusType.NoValue)
+        {
+            request.AddQueryParameter("maxResults", maxResults.ToStringInvariant());
+
+            if (fromEnteredTime.HasValue && (toEnteredTime.HasValue ? toEnteredTime.Value > fromEnteredTime.Value : true))
+                request.AddQueryParameter("fromEnteredTime", fromEnteredTime.Value.ToString("yyyy-MM-dd"));
+
+            if (toEnteredTime.HasValue && (fromEnteredTime.HasValue ? fromEnteredTime.Value < toEnteredTime.Value : true))
+                request.AddQueryParameter("fromEnteredTime", toEnteredTime.Value.ToString("yyyy-MM-dd"));
+
+            if (orderStatusType != OrderStatusType.NoValue)
+                request.AddQueryParameter("status", orderStatusType.GetEnumValue());
+
+            return Execute<List<OrderModel>>(request);
         }
 
         #endregion

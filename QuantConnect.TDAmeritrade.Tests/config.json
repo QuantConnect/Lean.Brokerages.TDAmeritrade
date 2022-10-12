@@ -2,6 +2,7 @@
   "data-folder": "../../../../../Lean/Data/",
   "data-directory": "../../../../../Lean/Data/",
 
+  "tdameritrade-account-number": "",
   "tdameritrade-consumer-key": "",
   "tdameritrade-callback-url": "http://localhost",
   "tdameritrade-code-from-url": "",

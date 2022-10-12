@@ -81,16 +81,16 @@ namespace QuantConnect.TDAmeritrade.Application
                 if (!raw.IsSuccessful)
                 {
                     // The API key has invalid
-                    if (raw.Content.Contains("The API key in request query param is either null or blank or invalid"))
+                    if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
+                    {
+                        _accessToken = string.Empty;
+                    }
+                    else if (!string.IsNullOrEmpty(raw.Content))
                     {
                         var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
 
                         return string.Empty;
-                    }
-                    else if(raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
-                    {
-                        _accessToken = string.Empty;
                     }
 
                     Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");

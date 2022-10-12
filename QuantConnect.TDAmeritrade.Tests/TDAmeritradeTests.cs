@@ -213,12 +213,12 @@ namespace QuantConnect.TDAmeritrade.Tests
         [Test]
         public void GetOrdersByPath()
         {
-            var order = _brokerage.GetOrdersByPath().First();
+            var order = _brokerage.GetOrdersByPath(5).First();
 
             Assert.IsNotNull(order);
             Assert.IsNotEmpty(order.Status);
             Assert.Greater(order.AccountId, 0);
-            Assert.Greater(order.Price, 0);
+            Assert.GreaterOrEqual(order.Price, 0);
             Assert.IsNotEmpty(order.OrderType);
 
             Assert.IsNotNull(order.OrderLegCollections);
@@ -246,15 +246,34 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.IsNotEmpty(order.OrderLegCollections[0].Instrument.Symbol);
         }
 
+        [Test]
+        public void GetUserPrincipals()
+        {
+            var userPrincipals = _brokerage.GetUserPrincipals();
+
+            Assert.IsNotNull(userPrincipals);
+        }
+
+        [TestCase("9556056706")]
+        [TestCase("9556720217")]
+        [TestCase("9558159438")]
+        [TestCase("9558160576")]
+        public void CancelOrder(string orderNumber)
+        {
+            var res = _brokerage.CancelOrder(orderNumber);
+
+            Assert.IsFalse(res);
+        }
+
         [Ignore("Market hasn't completed yet")]
-        [TestCase(OrderType.Market)]
-        public void PostOrderMarket(OrderType orderType)
+        [TestCase(OrderType.Market, InstructionType.Buy, 1, "BLZE")]
+        public void PostOrderMarket(OrderType orderType, InstructionType instructionType, decimal quantity, string symbol)
         {
             var session = SessionType.Normal;
             var duration = DurationType.Day;
             var orderStrategyType = OrderStrategyType.Single;
 
-            PlaceOrderLegCollectionModel orderLegCollectionModel = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
+            PlaceOrderLegCollectionModel orderLegCollectionModel = new(instructionType, quantity, new InstrumentPlaceOrderModel(symbol, "EQUITY"));
             //OrderLegCollectionModel orderLegCollectionModel2 = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
 
             List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
@@ -267,15 +286,17 @@ namespace QuantConnect.TDAmeritrade.Tests
         }
 
         [Ignore("Limit hasn't completed yet")]
-        [TestCase(OrderType.Limit, 0.0003)]
-        public void PostOrderLimit(OrderType orderType, decimal price)
+        [TestCase(OrderType.Limit, 0.0003, InstructionType.Buy, 1, "CBTRP")]
+        [TestCase(OrderType.Limit, 4.6, InstructionType.Sell, 1, "BLZE")]
+        [TestCase(OrderType.Limit, 4.55, InstructionType.Buy, 1, "BLZE")]
+        public void PostOrderLimit(OrderType orderType, decimal price, InstructionType instructionType, decimal quantity, string symbol)
         {
             var session = SessionType.Normal;
             var duration = DurationType.Day;
             var orderStrategyType = OrderStrategyType.Single;
             var complexOrderStrategyType = ComplexOrderStrategyType.None;
 
-            PlaceOrderLegCollectionModel orderLegCollectionModel = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
+            PlaceOrderLegCollectionModel orderLegCollectionModel = new(instructionType, quantity, new InstrumentPlaceOrderModel(symbol, "EQUITY"));
 
             List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
             orderLegCollectionModels.Add(orderLegCollectionModel);

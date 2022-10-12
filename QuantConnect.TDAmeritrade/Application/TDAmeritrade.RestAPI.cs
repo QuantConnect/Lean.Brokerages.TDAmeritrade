@@ -2,6 +2,7 @@
 using QuantConnect.Logging;
 using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
+using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels.UserInfoAndPreferences;
 using QuantConnect.TDAmeritrade.Utils.Extensions;
 using RestSharp;
 using System.Net;
@@ -228,6 +229,18 @@ namespace QuantConnect.TDAmeritrade.Application
             return Execute<OrderModel>(request);
         }
 
+        /// <summary>
+        /// User Principal details
+        /// </summary>
+        public UserPrincipalsModel GetUserPrincipals()
+        {
+            var request = new RestRequest("userprincipals", Method.GET);
+
+            request.AddQueryParameter("fields", "streamerSubscriptionKeys,streamerConnectionInfo,preferences,surrogateIds");
+
+            return Execute<UserPrincipalsModel>(request);
+        }
+
         #endregion
 
         #region POST
@@ -292,7 +305,7 @@ namespace QuantConnect.TDAmeritrade.Application
         /// <param name="complexOrderStrategyType">Limit</param>
         /// <param name="price">Limit</param>
         /// <returns></returns>
-        public string PostPlaceOrder(
+        public IEnumerable<OrderModel> PostPlaceOrder(
             OrderType orderType,
             SessionType sessionType, 
             DurationType durationType,
@@ -319,9 +332,18 @@ namespace QuantConnect.TDAmeritrade.Application
 
             request.AddJsonBody(JsonConvert.SerializeObject(body));
 
-            var str = Execute(request);
+            Execute(request); // Place Order
 
-            return str;
+            return GetOrdersByPath(orderLegCollectionModels.Count); // Get Order Detail
+        }
+
+        public bool CancelOrder(string orderNumber, string? accountNumber = null)
+        {
+            var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
+
+            var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.DELETE);
+
+            return string.IsNullOrEmpty(Execute(request)) ? false : true;
         }
 
         #endregion

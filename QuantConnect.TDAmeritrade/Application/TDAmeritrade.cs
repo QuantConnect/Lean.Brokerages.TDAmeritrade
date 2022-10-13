@@ -16,7 +16,7 @@ namespace QuantConnect.TDAmeritrade.Application
     [BrokerageFactory(typeof(TDAmeritrade))]
     public partial class TDAmeritrade : BaseWebsocketsBrokerage, IDataQueueHandler
     {
-        private string _accessToken;
+        private string _accessToken = string.Empty;
         private readonly string _consumerKey;
         private readonly string _refreshToken;
         private readonly string _callbackUrl;
@@ -25,13 +25,11 @@ namespace QuantConnect.TDAmeritrade.Application
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
 
-        private IRestClient _restClient;
-        private IAlgorithm _algorithm;
+        private readonly IAlgorithm _algorithm;
+        private readonly IDataAggregator _aggregator;
 
         private readonly object _lockAccessCredentials = new object();
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
-
-        public override bool IsConnected => throw new NotImplementedException();
 
         public TDAmeritrade() : base("TD Ameritrade")
         { }
@@ -44,7 +42,6 @@ namespace QuantConnect.TDAmeritrade.Application
             string accountNumber,
             IAlgorithm algorithm) : base("TD Ameritrade")
         {
-            _restClient = new RestClient(_restApiUrl);
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
             _callbackUrl = callbackUrl;
@@ -52,6 +49,7 @@ namespace QuantConnect.TDAmeritrade.Application
             _accountNumber = accountNumber;
             _algorithm = algorithm;
 
+            Initialize();
             //ValidateSubscription(); // Quant Connect api permission
         }
 
@@ -76,7 +74,7 @@ namespace QuantConnect.TDAmeritrade.Application
 
             lock (_lockAccessCredentials)
             {
-                var raw = _restClient.Execute(request);
+                var raw = RestClient.Execute(request);
 
                 if (!raw.IsSuccessful)
                 {
@@ -171,16 +169,6 @@ namespace QuantConnect.TDAmeritrade.Application
             return response;
         }
 
-        protected override void OnMessage(object sender, WebSocketMessage e)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override bool Subscribe(IEnumerable<Symbol> symbols)
-        {
-            throw new NotImplementedException();
-        }
-
         public override bool PlaceOrder(Order order)
         {
             throw new NotImplementedException();
@@ -192,11 +180,6 @@ namespace QuantConnect.TDAmeritrade.Application
         }
 
         public override bool CancelOrder(Order order)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void Disconnect()
         {
             throw new NotImplementedException();
         }
@@ -216,22 +199,28 @@ namespace QuantConnect.TDAmeritrade.Application
             throw new NotImplementedException();
         }
 
-        public IEnumerator<BaseData> Subscribe(SubscriptionDataConfig dataConfig, EventHandler newDataAvailableHandler)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Unsubscribe(SubscriptionDataConfig dataConfig)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void SetJob(LiveNodePacket job)
-        {
-            throw new NotImplementedException();
-        }
-
         #endregion
 
+        private void Initialize()
+        {
+            if (IsInitialized)
+            {
+                return;
+            }
+
+            RestClient = new RestClient(_restApiUrl);
+
+            var userPrincipals = GetUserPrincipals();
+            var wsUrl = $"wss://{userPrincipals.StreamerInfo.StreamerSocketUrl}/ws";
+
+            Initialize(wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
+
+            var subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
+            subscriptionManager.SubscribeImpl += (symbols, _) => Subscribe(symbols);
+            subscriptionManager.UnsubscribeImpl += (symbols, _) => Unsubscribe(symbols);
+            SubscriptionManager = subscriptionManager;
+
+            //ValidateSubscription(); // TODO: implement mthd
+        }
     }
 }

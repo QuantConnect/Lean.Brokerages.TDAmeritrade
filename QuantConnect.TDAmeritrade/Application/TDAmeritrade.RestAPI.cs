@@ -178,7 +178,7 @@ namespace QuantConnect.TDAmeritrade.Application
         /// If 'fromEnteredTime' is not sent, the default `fromEnteredTime` would be 60 days from `toEnteredTime`.
         /// </param>
         /// <param name="orderStatusType">Specifies that only orders of this status should be returned.</param>
-        public IEnumerable<OrderModel> GetOrdersByPath(int maxResults = 1, DateTime? fromEnteredTime = null, DateTime? toEnteredTime = null, OrderStatusType orderStatusType = OrderStatusType.NoValue)
+        public IEnumerable<OrderModel> GetOrdersByPath(int? maxResults = null, DateTime? fromEnteredTime = null, DateTime? toEnteredTime = null, OrderStatusType orderStatusType = OrderStatusType.NoValue)
         {
             var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.GET);
 
@@ -202,7 +202,7 @@ namespace QuantConnect.TDAmeritrade.Application
         /// <returns></returns>
         public IEnumerable<OrderModel> GetOrdersByQuery(
             string accountNumber,
-            int maxResults = 1, 
+            int? maxResults = null, 
             DateTime? fromEnteredTime = null, 
             DateTime? toEnteredTime = null, 
             OrderStatusType orderStatusType = OrderStatusType.NoValue)
@@ -462,18 +462,19 @@ namespace QuantConnect.TDAmeritrade.Application
 
         private IEnumerable<OrderModel> GetOrderByDifferentPath(
             RestRequest request,
-            int maxResults = 1,
+            int? maxResults = null,
             DateTime? fromEnteredTime = null,
             DateTime? toEnteredTime = null,
             OrderStatusType orderStatusType = OrderStatusType.NoValue)
         {
-            request.AddQueryParameter("maxResults", maxResults.ToStringInvariant());
+            if(maxResults.HasValue)
+                request.AddQueryParameter("maxResults", maxResults.Value.ToStringInvariant());
 
             if (fromEnteredTime.HasValue && (toEnteredTime.HasValue ? toEnteredTime.Value > fromEnteredTime.Value : true))
                 request.AddQueryParameter("fromEnteredTime", fromEnteredTime.Value.ToString("yyyy-MM-dd"));
 
             if (toEnteredTime.HasValue && (fromEnteredTime.HasValue ? fromEnteredTime.Value < toEnteredTime.Value : true))
-                request.AddQueryParameter("fromEnteredTime", toEnteredTime.Value.ToString("yyyy-MM-dd"));
+                request.AddQueryParameter("toEnteredTime", toEnteredTime.Value.ToString("yyyy-MM-dd"));
 
             if (orderStatusType != OrderStatusType.NoValue)
                 request.AddQueryParameter("status", orderStatusType.GetEnumValue());

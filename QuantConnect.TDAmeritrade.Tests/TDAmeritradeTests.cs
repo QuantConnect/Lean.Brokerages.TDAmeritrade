@@ -213,14 +213,14 @@ namespace QuantConnect.TDAmeritrade.Tests
         [Test]
         public void GetOrdersByPath()
         {
-            var order = _brokerage.GetOrdersByPath(5).First();
+            var currentDay = DateTime.Now;
+            var order = _brokerage.GetOrdersByPath(10, toEnteredTime: currentDay).First();
 
             Assert.IsNotNull(order);
             Assert.IsNotEmpty(order.Status);
             Assert.Greater(order.AccountId, 0);
             Assert.GreaterOrEqual(order.Price, 0);
             Assert.IsNotEmpty(order.OrderType);
-
             Assert.IsNotNull(order.OrderLegCollections);
             Assert.Greater(order.OrderLegCollections[0].Quantity, 0);
             Assert.Greater(order.OrderLegCollections[0].LegId, 0);
@@ -263,6 +263,14 @@ namespace QuantConnect.TDAmeritrade.Tests
             var res = _brokerage.CancelOrder(orderNumber);
 
             Assert.IsFalse(res);
+        }
+
+        [Test]
+        public void GetOpenOrders()
+        {
+            var orders = _brokerage.GetOpenOrders();
+
+            Assert.IsNotNull(orders);
         }
 
         [Ignore("Market hasn't completed yet")]

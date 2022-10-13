@@ -4,6 +4,7 @@ namespace QuantConnect.TDAmeritrade.Domain.Enums
 {
     public enum OrderStatusType
     {
+        [EnumMember(Value = "No Value")]
         NoValue = 0,
         [EnumMember(Value = "AWAITING_PARENT_ORDER")]
         AwaitingParentOrder = 1,

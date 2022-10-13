@@ -4,10 +4,10 @@ using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
-using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
+using QuantConnect.TDAmeritrade.Utils.Extensions;
 using QuantConnect.Util;
 using RestSharp;
 
@@ -186,7 +186,18 @@ namespace QuantConnect.TDAmeritrade.Application
 
         public override List<Order> GetOpenOrders()
         {
-            throw new NotImplementedException();
+            var orders = new List<Order>();
+
+            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.PendingActivation);
+
+            foreach (var openOrder in openOrders)
+            {
+                // make sure our internal collection is up to date as well
+                //UpdateCachedOpenOrder(openOrder.Id, openOrder);
+                orders.Add(ConvertOrder(openOrder));
+            }
+
+            return orders;
         }
 
         public override List<Holding> GetAccountHoldings()
@@ -221,6 +232,90 @@ namespace QuantConnect.TDAmeritrade.Application
             SubscriptionManager = subscriptionManager;
 
             //ValidateSubscription(); // TODO: implement mthd
+        }
+
+        protected Order ConvertOrder(OrderModel order)
+        {
+            Order qcOrder;
+
+            var symbol = order.OrderLegCollections[0].Instrument.Symbol;// _symbolMapper.GetLeanSymbol(order.Class == TradierOrderClass.Option ? order.OptionSymbol : order.Symbol);
+            var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ToEnum<InstructionType>());
+            var time = Time.ParseDate(order.EnteredTime);
+
+            switch (order.OrderType.ToEnum<Domain.Enums.OrderType>())
+            {
+                case Domain.Enums.OrderType.Market:
+                    qcOrder = new MarketOrder(symbol, quantity, time);
+                    break;
+                case Domain.Enums.OrderType.Limit:
+                    qcOrder = new LimitOrder(symbol, quantity, order.Price, time);
+                    break;
+                //case Domain.Enums.OrderType.Stop:
+                //    qcOrder = new StopMarketOrder(symbol, quantity, order..StopPrice, time);
+                //    break;
+
+                //case Domain.Enums.OrderType.StopLimit:
+                //    qcOrder = new StopLimitOrder(symbol, quantity, GetOrder(order.Id).StopPrice, order.Price, time);
+                //    break;
+
+                //case TradierOrderType.Credit:
+                //case TradierOrderType.Debit:
+                //case TradierOrderType.Even:
+                default:
+                    throw new NotImplementedException("The Tradier order type " + order.OrderType + " is not implemented.");
+            }
+
+            qcOrder.Status = ConvertStatus(order.Status.ToEnum<OrderStatusType>());
+            qcOrder.BrokerId.Add(order.OrderId.ToStringInvariant());
+            return qcOrder;
+        }
+
+        protected int ConvertQuantity(decimal quantity, InstructionType instructionType )
+        {
+            switch (instructionType)
+            {
+                case InstructionType.Buy:
+                case InstructionType.BuyToCover:
+                case InstructionType.BuyToClose:
+                case InstructionType.BuyToOpen:
+                    return (int)quantity;
+
+                case InstructionType.SellToClose:
+                case InstructionType.Sell:
+                case InstructionType.SellToOpen:
+                    return -(int)quantity;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        protected OrderStatus ConvertStatus(OrderStatusType status)
+        {
+            switch (status)
+            {
+                case OrderStatusType.Filled:
+                    return OrderStatus.Filled;
+
+                case OrderStatusType.Canceled:
+                    return OrderStatus.Canceled;
+
+                case OrderStatusType.PendingActivation:
+                    return OrderStatus.Submitted;
+
+                case OrderStatusType.Expired:
+                case OrderStatusType.Rejected:
+                    return OrderStatus.Invalid;
+
+                case OrderStatusType.Queued:
+                    return OrderStatus.New;
+
+                case OrderStatusType.Working:
+                    return OrderStatus.PartiallyFilled;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 }

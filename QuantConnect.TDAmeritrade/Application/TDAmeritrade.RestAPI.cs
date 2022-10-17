@@ -289,6 +289,28 @@ namespace QuantConnect.TDAmeritrade.Application
             return markets;
         }
 
+        /// <summary>
+        /// Top 10 (up or down) movers by value or percent for a particular market
+        /// </summary>
+        /// <param name="indexMoverType">The index symbol to get movers from. ($COMPX, $DJI, $SPX.X)</param>
+        /// <param name="directionType">To return movers with the specified directions of up or down.</param>
+        /// <param name="changeType">To return movers with the specified change types of percent or value</param>
+        /// <returns></returns>
+        public List<MoverModel> GetMovers(IndexMoverType indexMoverType, DirectionType directionType = DirectionType.NoValue, ChangeType changeType = ChangeType.NoValue)
+        {
+            var request = new RestRequest($"marketdata/{indexMoverType.GetEnumValue()}/movers", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+            if(directionType != DirectionType.NoValue)
+                request.AddQueryParameter("direction", directionType.GetEnumValue());
+
+            if (changeType != ChangeType.NoValue)
+                request.AddQueryParameter("change", changeType.GetEnumValue());
+
+            return Execute<List<MoverModel>>(request);
+        }
+
         #endregion
 
         #region POST

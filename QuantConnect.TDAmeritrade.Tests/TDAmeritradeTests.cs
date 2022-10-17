@@ -310,6 +310,19 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.That(hoursOption.Count, Is.EqualTo(marketTypes.Length));
         }
 
+        [TestCase(IndexMoverType.DJI, DirectionType.NoValue, ChangeType.NoValue)]
+        [TestCase(IndexMoverType.COMPX, DirectionType.NoValue, ChangeType.NoValue)]
+        [TestCase(IndexMoverType.COMPX, DirectionType.Down, ChangeType.Percent)]
+        [TestCase(IndexMoverType.SPX_X, DirectionType.NoValue, ChangeType.NoValue)]
+        [TestCase(IndexMoverType.SPX_X, DirectionType.Up, ChangeType.Value)]
+        public void GetMovers(IndexMoverType indexMoverType, DirectionType directionType, ChangeType changeType)
+        {
+            var mover = _brokerage.GetMovers(indexMoverType);
+
+            Assert.IsNotNull(mover);
+            Assert.Greater(mover.Count, 0);
+        }
+
         [Ignore("Market hasn't completed yet")]
         [TestCase(OrderType.Market, InstructionType.Buy, 1, "BLZE")]
         public void PostOrderMarket(OrderType orderType, InstructionType instructionType, decimal quantity, string symbol)

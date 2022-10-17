@@ -273,6 +273,43 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.IsNotNull(orders);
         }
 
+        [TestCase(MarketType.OPTION)]
+        [TestCase(MarketType.BOND)]
+        [TestCase(MarketType.EQUITY)]
+        [TestCase(MarketType.FUTURE)]
+        [TestCase(MarketType.FOREX)]
+        public void GetHoursForSingleMarket(MarketType marketType)
+        {
+            var hoursOption = _brokerage.GetHoursForSingleMarket(marketType);
+
+            Assert.IsNotNull(hoursOption);
+
+            var market = hoursOption[hoursOption.Keys.First()];
+
+            Assert.IsNotEmpty(market.Category);
+            Assert.IsNotEmpty(market.Date);
+            Assert.IsNotEmpty(market.Exchange);
+            Assert.IsNotEmpty(market.MarketType);
+            Assert.IsNotEmpty(market.Product);
+            Assert.IsNotEmpty(market.ProductName);
+
+            if (market.SessionHours != null)
+            {
+                Assert.IsNotEmpty(market.SessionHours[market.SessionHours.Keys.First()][0].Start);
+                Assert.IsNotEmpty(market.SessionHours[market.SessionHours.Keys.First()][0].End);
+            }
+        }
+
+        [TestCase(MarketType.OPTION, MarketType.BOND)]
+        [TestCase(MarketType.FUTURE, MarketType.OPTION, MarketType.BOND, MarketType.FOREX, MarketType.EQUITY)]
+        public void GetHoursForMultipleMarkets(params MarketType[] marketTypes)
+        {
+            var hoursOption = _brokerage.GetHoursForMultipleMarkets(marketTypes);
+
+            Assert.IsNotNull(hoursOption);
+            Assert.That(hoursOption.Count, Is.EqualTo(marketTypes.Length));
+        }
+
         [Ignore("Market hasn't completed yet")]
         [TestCase(OrderType.Market, InstructionType.Buy, 1, "BLZE")]
         public void PostOrderMarket(OrderType orderType, InstructionType instructionType, decimal quantity, string symbol)

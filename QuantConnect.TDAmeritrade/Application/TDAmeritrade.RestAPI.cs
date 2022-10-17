@@ -2,6 +2,7 @@
 using QuantConnect.Logging;
 using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
+using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels.MarketHours;
 using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels.UserInfoAndPreferences;
 using QuantConnect.TDAmeritrade.Utils.Extensions;
 using RestSharp;
@@ -239,6 +240,53 @@ namespace QuantConnect.TDAmeritrade.Application
             request.AddQueryParameter("fields", "streamerSubscriptionKeys,streamerConnectionInfo,preferences,surrogateIds");
 
             return Execute<UserPrincipalsModel>(request);
+        }
+
+        /// <summary>
+        /// Retrieve market hours for specified markets
+        /// </summary>
+        public void GetHoursForMultipleMarkets()
+        {
+            var request = new RestRequest("marketdata/hours", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+
+
+        }
+
+        /// <summary>
+        /// Retrieve market hours for specified single market
+        /// </summary>
+        /// <param name="marketType">EQUITY, OPTION, FUTURE, BOND, FOREX</param>
+        /// <returns>return market data by specific market type</returns>
+        public Dictionary<string, MarketHoursModel> GetHoursForSingleMarket(MarketType marketType)
+        {
+            var request = new RestRequest($"marketdata/{marketType.GetEnumValue()}/hours", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+            var market = Execute<Dictionary<string, Dictionary<string, MarketHoursModel>>>(request);
+
+            return market[market.Keys.First()];
+        }
+
+        /// <summary>
+        /// Retrieve market hours for specified markets
+        /// </summary>
+        /// <param name="marketType">EQUITY, OPTION, FUTURE, BOND, FOREX</param>
+        /// <returns>return market data by specific market type</returns>
+        public Dictionary<string, Dictionary<string, MarketHoursModel>> GetHoursForMultipleMarkets(params MarketType[] marketTypes)
+        {
+            var request = new RestRequest("marketdata/hours", Method.GET);
+
+            request.AddQueryParameter("apikey", _consumerKey);
+
+            request.AddQueryParameter("markets", string.Join(',', marketTypes.Select(x => x.GetEnumValue())));
+
+            var markets = Execute<Dictionary<string, Dictionary<string, MarketHoursModel>>>(request);
+
+            return markets;
         }
 
         #endregion

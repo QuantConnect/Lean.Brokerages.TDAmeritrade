@@ -311,6 +311,47 @@ namespace QuantConnect.TDAmeritrade.Application
             return Execute<List<MoverModel>>(request);
         }
 
+        /// <summary>
+        /// Transactions for a specific account.
+        /// </summary>
+        /// <param name="accountNumber"></param>
+        /// <param name="transactionType">Only transactions with the specified type will be returned.</param>
+        /// <param name="symbol">Only transactions with the specified symbol will be returned.</param>
+        /// <param name="startDate">Only transactions after the Start Date will be returned.
+        /// Note: The maximum date range is one year.Valid ISO-8601 formats are :
+        /// yyyy-MM-dd.
+        /// </param>
+        /// <param name="endDate">Only transactions before the End Date will be returned.
+        /// Note: The maximum date range is one year.Valid ISO-8601 formats are :
+        /// yyyy-MM-dd.
+        /// </param>
+        /// <returns>Collection of Transactions</returns>
+        public IEnumerable<TransactionModel> GetTransactions(
+            string? accountNumber = null, 
+            TransactionType transactionType = TransactionType.NO_VALUE,
+            string?  symbol = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null)
+        {
+            var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
+
+            var request = new RestRequest($"accounts/{account}/transactions", Method.GET);
+
+            if (transactionType != TransactionType.NO_VALUE)
+                request.AddQueryParameter("type", transactionType.GetEnumValue());
+
+            if(!string.IsNullOrEmpty(symbol))
+                request.AddQueryParameter("symbol", symbol);
+
+            if (startDate.HasValue && (endDate.HasValue ? endDate.Value > startDate.Value : true))
+                request.AddQueryParameter("startDate", startDate.Value.ToString("yyyy-MM-dd"));
+
+            if (endDate.HasValue && (startDate.HasValue ? startDate.Value < endDate.Value : true))
+                request.AddQueryParameter("endDate", endDate.Value.ToString("yyyy-MM-dd"));
+
+            return Execute<List<TransactionModel>>(request);
+        }
+
         #endregion
 
         #region POST

@@ -323,6 +323,20 @@ namespace QuantConnect.TDAmeritrade.Tests
             Assert.Greater(mover.Count, 0);
         }
 
+        [TestCase(TransactionType.TRADE, null)]
+        [TestCase(TransactionType.TRADE, "BLZE")]
+        [TestCase(TransactionType.BUY_ONLY, null)]
+        public void GetTransaction(TransactionType transactionType, string symbol)
+        {
+            var transactions = _brokerage.GetTransactions(transactionType: transactionType, symbol: symbol);
+
+            Assert.IsNotNull(transactions);
+            Assert.Greater(transactions.Count(), 0);
+
+            Assert.IsNotEmpty(transactions.First().Instrument.Symbol);
+            Assert.IsNotEmpty(transactions.First().Instrument.Cusip);
+        }
+
         [Ignore("Market hasn't completed yet")]
         [TestCase(OrderType.Market, InstructionType.Buy, 1, "BLZE")]
         public void PostOrderMarket(OrderType orderType, InstructionType instructionType, decimal quantity, string symbol)

@@ -1,7 +1,4 @@
-﻿using QuantConnect.TDAmeritrade.Domain.Enums;
-using QuantConnect.TDAmeritrade.Utils.Extensions;
-
-namespace QuantConnect.TDAmeritrade.Tests
+﻿namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
     public class TDAmeritradeUtilsTests
     {

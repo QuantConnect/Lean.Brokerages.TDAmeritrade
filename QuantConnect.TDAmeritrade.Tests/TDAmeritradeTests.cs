@@ -1,16 +1,14 @@
 ﻿using QuantConnect.Data;
 using QuantConnect.Configuration;
-using QuantConnect.TDAmeritrade.Domain.Enums;
 using QuantConnect.Securities;
 using NodaTime;
 using QuantConnect.Data.Market;
-using QuantConnect.TDAmeritrade.Domain.TDAmeritradeModels;
 
-namespace QuantConnect.TDAmeritrade.Tests
+namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
     public class TDAmeritradeTests
     {
-        private Application.TDAmeritrade _brokerage;
+        private TDAmeritradeBrokerage _brokerage;
 
         private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
         private readonly string _callbackUrl = Config.Get("tdameritrade-callback-url");
@@ -19,7 +17,7 @@ namespace QuantConnect.TDAmeritrade.Tests
         private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new Application.TDAmeritrade(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null);
+        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)

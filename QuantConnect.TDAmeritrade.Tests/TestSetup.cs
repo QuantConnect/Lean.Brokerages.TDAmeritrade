@@ -1,16 +1,8 @@
-﻿using NUnit.Framework;
-using QuantConnect.Configuration;
+﻿using QuantConnect.Configuration;
 using QuantConnect.Logging;
-using QuantConnect.Tests;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace QuantConnect.TradingTechnologiesTests
+namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
     [TestFixture]
     public class TestSetup

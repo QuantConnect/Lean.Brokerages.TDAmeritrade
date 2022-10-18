@@ -22,6 +22,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly string _accountNumber;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
+        /// <summary>
+        /// WebSocekt URL
+        /// We can get url from GetUserPrincipals() mthd
+        /// </summary>
+        private string _wsUrl = "wss://streamer-ws.tdameritrade.com/ws";
 
         private readonly IAlgorithm _algorithm;
         private readonly IDataAggregator _aggregator;
@@ -53,22 +58,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region TD Ameritrade client
 
-        private string Execute(RestRequest request, string rootName = "", int attempts = 0, int max = 10)
+        private T Execute<T>(RestRequest request, string rootName = "")
         {
-            if (string.IsNullOrEmpty(_accessToken))
-                Task.Run(() => PostAccessToken(GrantType.RefreshToken, string.Empty)).GetAwaiter().GetResult();
-
-            request.AddOrUpdateHeader("Authorization", _accessToken);
-
-            string response = null;
+            var response = default(T);
 
             var method = "TDAmeritrade.Execute." + request.Resource;
             var parameters = request.Parameters.Select(x => x.Name + ": " + x.Value);
-
-            if (attempts != 0)
-            {
-                Log.Trace(method + "(): Begin attempt " + attempts);
-            }
 
             lock (_lockAccessCredentials)
             {
@@ -76,92 +71,42 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (!raw.IsSuccessful)
                 {
-                    // The API key has invalid
                     if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                     {
                         _accessToken = string.Empty;
+                        RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", _accessToken, ParameterType.HttpHeader));
+                        Execute<T>(request, rootName);
                     }
                     else if (!string.IsNullOrEmpty(raw.Content))
                     {
                         var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
+                        Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
-
-                        return string.Empty;
+                        return response;
                     }
-
-                    Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
-
-                    if (attempts++ < max)
-                    {
-                        Log.Trace(method + "(2): Attempting again...");
-                        // this will retry on time outs and other transport exception
-                        Thread.Sleep(3000);
-                        return Execute(request, rootName, attempts, max);
-                    }
-                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, raw.StatusCode.ToStringInvariant(), raw.Content));
-
-                    return string.Empty;
                 }
 
                 try
                 {
-                    if (!string.IsNullOrEmpty(raw.Content))
-                        return raw.Content;
+                    if (typeof(T) == typeof(String))
+                        return (T)(object)raw.Content;
 
-                    response = null;
+                    if (!string.IsNullOrEmpty(rootName))
+                    {
+                        if (TryDeserializeRemoveRoot(raw.Content, rootName, out response))
+                        {
+                            return response;
+                        }
+                    }
+                    else
+                    {
+                        return JsonConvert.DeserializeObject<T>(raw.Content);
+                    }
                 }
                 catch (Exception e)
                 {
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw.Content} Error: {e.Message}"));
                 }
-
-                if (raw.ErrorException != null)
-                {
-                    if (attempts++ < max)
-                    {
-                        Log.Trace(method + "(3): Attempting again...");
-                        // this will retry on time outs and other transport exception
-                        Thread.Sleep(3000);
-                        return Execute(request, rootName, attempts, max);
-                    }
-
-                    Log.Trace(method + "(3): Parameters: " + string.Join(",", parameters));
-                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, raw.ErrorException.GetType().Name, raw.ErrorException.ToString()));
-
-                    const string message = "Error retrieving response.  Check inner details for more info.";
-                    throw new ApplicationException(message, raw.ErrorException);
-                }
-            }
-
-            return response;
-        }
-
-        private T Execute<T>(RestRequest request, string rootName = "", int attempts = 0, int max = 10) where T : new()
-        {
-            var response = default(T);
-
-            var raw = Execute(request, rootName, attempts, max);
-
-            if (string.IsNullOrEmpty(raw))
-                return response;
-
-            try
-            {
-                if (!string.IsNullOrEmpty(rootName))
-                {
-                    if (TryDeserializeRemoveRoot(raw, rootName, out response))
-                    {
-                        return response;
-                    }
-                }
-                else
-                {
-                    response = JsonConvert.DeserializeObject<T>(raw);
-                }
-            }
-            catch (Exception e)
-            {
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw} Error: {e.Message}"));
             }
 
             return response;
@@ -219,10 +164,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             RestClient = new RestClient(_restApiUrl);
 
-            var userPrincipals = GetUserPrincipals();
-            var wsUrl = $"wss://{userPrincipals.StreamerInfo.StreamerSocketUrl}/ws";
+            if (string.IsNullOrEmpty(_accessToken))
+            {
+                PostAccessToken(GrantType.RefreshToken, string.Empty);
+                RestClient.AddDefaultHeader("Authorization", _accessToken);
+            }
 
-            Initialize(wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
+            Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 
             var subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
             subscriptionManager.SubscribeImpl += (symbols, _) => Subscribe(symbols);

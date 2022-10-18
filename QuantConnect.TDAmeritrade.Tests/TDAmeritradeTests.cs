@@ -174,17 +174,17 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         [Ignore("You have to update your code from url in config to complete this test, seeAlso: GetSignInUrl() Test")]
         [Test]
-        public async Task GetRefreshToken()
+        public void GetRefreshToken()
         {
-            var res = await _brokerage.PostAccessToken(GrantType.AuthorizationCode, _codeFromUrl);
+            var res = _brokerage.PostAccessToken(GrantType.AuthorizationCode, _codeFromUrl);
 
             Assert.IsNotNull(res);
         }
 
         [Test]
-        public async Task UpdateAccessToken()
+        public void UpdateAccessToken()
         {
-            var res = await _brokerage.PostAccessToken(GrantType.RefreshToken, string.Empty);
+            var res = _brokerage.PostAccessToken(GrantType.RefreshToken, string.Empty);
             
             Assert.IsNotNull(res);
         }

@@ -111,7 +111,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddQueryParameter("symbol", symbolsInOneLine);
 
-            var jsonResponse = Execute(request);
+            var jsonResponse = Execute<string>(request);
 
             var qutes = new List<QuoteTDAmeritradeModel>(symbols.Length);
 
@@ -362,7 +362,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="redirectUrl">Required if trying to use authorization code grant</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<AccessTokenModel> PostAccessToken(GrantType grantType, string code)
+        public AccessTokenModel PostAccessToken(GrantType grantType, string code)
         {
             var path = _restApiUrl + "oauth2/token";
 
@@ -387,12 +387,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     body["redirect_uri"] = _callbackUrl;
 
                 var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(body) };
-                var res = await client.SendAsync(req);
+                var res = client.Send(req);
 
                 switch (res.StatusCode)
                 {
                     case HttpStatusCode.OK:
-                        var accessTokens = JsonConvert.DeserializeObject<AccessTokenModel>(await res.Content.ReadAsStringAsync());
+                        var accessTokens = JsonConvert.DeserializeObject<AccessTokenModel>(res.Content.ReadAsStringAsync().GetAwaiter().GetResult());
                         _accessToken = accessTokens.TokenType + " " + accessTokens.AccessToken;
                         return accessTokens;
                     default:
@@ -440,7 +440,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddJsonBody(JsonConvert.SerializeObject(body));
 
-            Execute(request); // Place Order
+            Execute<string>(request); // Place Order
 
             return GetOrdersByPath(orderLegCollectionModels.Count); // Get Order Detail
         }
@@ -451,7 +451,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.DELETE);
 
-            return string.IsNullOrEmpty(Execute(request)) ? false : true;
+            return string.IsNullOrEmpty(Execute<string>(request)) ? false : true;
         }
 
         #endregion

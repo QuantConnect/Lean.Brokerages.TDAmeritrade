@@ -14,7 +14,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     [BrokerageFactory(typeof(TDAmeritradeBrokerage))]
     public partial class TDAmeritradeBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {
-        private string _accessToken = string.Empty;
         private readonly string _consumerKey;
         private readonly string _refreshToken;
         private readonly string _callbackUrl;
@@ -73,8 +72,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                     {
-                        _accessToken = string.Empty;
-                        RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", _accessToken, ParameterType.HttpHeader));
+                        PostAccessToken(GrantType.RefreshToken, string.Empty);
                         Execute<T>(request, rootName);
                     }
                     else if (!string.IsNullOrEmpty(raw.Content))
@@ -164,11 +162,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             RestClient = new RestClient(_restApiUrl);
 
-            if (string.IsNullOrEmpty(_accessToken))
-            {
-                PostAccessToken(GrantType.RefreshToken, string.Empty);
-                RestClient.AddDefaultHeader("Authorization", _accessToken);
-            }
+            PostAccessToken(GrantType.RefreshToken, string.Empty);
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 

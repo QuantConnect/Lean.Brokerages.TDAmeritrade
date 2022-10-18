@@ -393,7 +393,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     case HttpStatusCode.OK:
                         var accessTokens = JsonConvert.DeserializeObject<AccessTokenModel>(res.Content.ReadAsStringAsync().GetAwaiter().GetResult());
-                        _accessToken = accessTokens.TokenType + " " + accessTokens.AccessToken;
+                        RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
                         return accessTokens;
                     default:
                         Log.Error($"TDAmeritrade.SignIn: StatusCode:{res.StatusCode}, ReasonPhrase:{res.ReasonPhrase}");

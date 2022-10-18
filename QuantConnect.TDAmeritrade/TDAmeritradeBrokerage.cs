@@ -28,6 +28,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string _wsUrl = "wss://streamer-ws.tdameritrade.com/ws";
 
         private readonly IAlgorithm _algorithm;
+        private ISecurityProvider _securityProvider;
         private readonly IDataAggregator _aggregator;
 
         private readonly object _lockAccessCredentials = new object();
@@ -42,7 +43,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string callbackUrl,
             string codeFromUrl,
             string accountNumber,
-            IAlgorithm algorithm) : base("TD Ameritrade")
+            IAlgorithm algorithm,
+            ISecurityProvider securityProvider) : base("TD Ameritrade")
         {
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
@@ -50,6 +52,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _codeFromUrl = codeFromUrl;
             _accountNumber = accountNumber;
             _algorithm = algorithm;
+            _securityProvider = securityProvider;
 
             Initialize();
             //ValidateSubscription(); // Quant Connect api permission
@@ -143,12 +146,31 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override List<Holding> GetAccountHoldings()
         {
-            throw new NotImplementedException();
+            var positions = GetAccount(_accountNumber).SecuritiesAccount.Positions;
+
+            var holdings = new List<Holding>(positions.Count);
+
+            foreach (var hold in positions)
+            {
+                var symbol = Symbol.Create(hold.ProjectedBalances.Symbol, SecurityType.Equity, Market.USA);
+
+                holdings.Add(new Holding()
+                {
+                    Symbol = symbol,
+                    AveragePrice = hold.AveragePrice,
+                    MarketPrice = hold.MarketValue,
+                    Quantity = hold.SettledLongQuantity + hold.SettledShortQuantity,
+                    MarketValue = hold.MarketValue,
+                    UnrealizedPnL = hold.CurrentDayProfitLossPercentage // % or $ - ?
+                });
+            }
+            return holdings;
         }
 
         public override List<CashAmount> GetCashBalance()
         {
-            throw new NotImplementedException();
+            var balance = GetAccount(_accountNumber).SecuritiesAccount.CurrentBalances.AvailableFunds;
+            return new List<CashAmount>() { new CashAmount(balance, Currencies.USD) };
         }
 
         #endregion

@@ -17,7 +17,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null);
+        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null);
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -206,6 +206,34 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFunds, 0);
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.BuyingPower, 0);
             Assert.Greater(res[0].SecuritiesAccount.ProjectedBalances.AvailableFundsNonMarginableTrade, 0);
+        }
+
+        [Test]
+        public void GetAccount()
+        {
+            var res = _brokerage.GetAccount(_accountNumber);
+
+            Assert.IsNotNull(res);
+            Assert.Greater(res.SecuritiesAccount.InitialBalances.CashBalance, 0);
+            Assert.Greater(res.SecuritiesAccount.InitialBalances.Equity, 0);
+            Assert.Greater(res.SecuritiesAccount.InitialBalances.LongStockValue, 0);
+
+            Assert.Greater(res.SecuritiesAccount.CurrentBalances.CashBalance, 0);
+            Assert.Greater(res.SecuritiesAccount.CurrentBalances.LiquidationValue, 0);
+            Assert.Greater(res.SecuritiesAccount.CurrentBalances.BuyingPowerNonMarginableTrade, 0);
+
+            Assert.Greater(res.SecuritiesAccount.ProjectedBalances.AvailableFunds, 0);
+            Assert.Greater(res.SecuritiesAccount.ProjectedBalances.BuyingPower, 0);
+            Assert.Greater(res.SecuritiesAccount.ProjectedBalances.AvailableFundsNonMarginableTrade, 0);
+        }
+
+        [Test]
+        public void GetAccountHoldings()
+        {
+            var res = _brokerage.GetAccountHoldings();
+
+            Assert.IsNotNull(res);
+            Assert.Greater(res.Count, 0);
         }
 
         [Test]

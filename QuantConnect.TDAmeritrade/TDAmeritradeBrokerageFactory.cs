@@ -39,7 +39,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var refreshToken = Read<string>(job.BrokerageData, "tdameritrade-refresh-token", errors);
             var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
-            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm);
+            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm, algorithm.Portfolio);
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

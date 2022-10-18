@@ -154,13 +154,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Account balances, positions, and orders for a specific account.
         /// </summary>
-        public List<AccountModel> GetAccount(string accountNumber)
+        public AccountModel GetAccount(string accountNumber)
         {
             var request = new RestRequest($"accounts/{accountNumber}", Method.GET);
 
             request.AddQueryParameter("fields", "positions,orders");
 
-            return Execute<List<AccountModel>>(request);
+            return Execute<AccountModel>(request);
         }
 
         /// <summary>

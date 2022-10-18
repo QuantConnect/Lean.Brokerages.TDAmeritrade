@@ -80,7 +80,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
     public class Instrument
     {
         [JsonProperty(PropertyName = "assetType")]
-        public string AssetType { get; set; } = string.Empty;
+        public OrderLegType AssetType { get; set; }
 
         [JsonProperty(PropertyName = "cusip")]
         public string Cusip { get; set; } = string.Empty;

@@ -13,7 +13,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
 
         [OneTimeSetUp]
-        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null);
+        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null);
 
         [Test]
         public void GetLoginRequstWS()

@@ -5,6 +5,7 @@ using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
 using QuantConnect.Util;
 using RestSharp;
@@ -83,7 +84,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
                         Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
-                        return response;
+                        return (T)(object)fault.Error;
                     }
                 }
 
@@ -115,7 +116,62 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override bool PlaceOrder(Order order)
         {
-            throw new NotImplementedException();
+            var orderLegCollection = new List<PlaceOrderLegCollectionModel>()
+            {
+                new PlaceOrderLegCollectionModel(
+                    ConvertQCOrderDirectionToExchange(order.Direction),
+                    Math.Abs(order.Quantity),
+                    new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
+                    )
+            };
+
+            var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
+
+            decimal limitPrice = 0m;
+            if (!isOrderMarket)
+            {
+                limitPrice =
+                    (order as LimitOrder)?.LimitPrice ??
+                    (order as StopLimitOrder)?.LimitPrice ?? 0;
+            }
+
+            decimal stopPrice = 0m;
+            if (order.Type == Orders.OrderType.StopLimit)
+                stopPrice = (order as StopLimitOrder)?.StopPrice ?? 0;
+
+            var response = PostPlaceOrder(
+                ConvertQCOrderTypeToExchange(order.Type),
+                SessionType.Normal,
+                DurationType.Day,
+                OrderStrategyType.Single,
+                orderLegCollection,
+                isOrderMarket ? null : ComplexOrderStrategyType.None,
+                limitPrice.RoundToSignificantDigits(4),
+                stopPrice.RoundToSignificantDigits(4));
+
+            var orderFee = OrderFee.Zero;
+            if (!string.IsNullOrEmpty(response))
+            {
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = response });
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, response));
+                return false;
+            }
+
+            var orderResponse = GetOrdersByPath().First();
+            if (orderResponse.Status == OrderStatusType.Rejected)
+            {
+                var errorMessage = $"Reject reason: {orderResponse.StatusDescription}"; 
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, errorMessage));
+                return true;
+            }
+
+            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
+
+            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Submitted });
+            Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
+
+            return true;
         }
 
         public override bool UpdateOrder(Order order)
@@ -125,7 +181,24 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override bool CancelOrder(Order order)
         {
-            throw new NotImplementedException();
+            var success = new List<bool>();
+
+            foreach (var id in order.BrokerId)
+            {
+                var res = CancelOrder(id);
+
+                if (res)
+                {
+                    success.Add(res);
+                    OnOrderEvent(new OrderEvent(order,
+                        DateTime.UtcNow,
+                        OrderFee.Zero,
+                        "TDAmeritrade Order Event")
+                    { Status = OrderStatus.Canceled });
+                }
+            }
+
+            return success.All(a => a);
         }
 
         public override List<Order> GetOpenOrders()
@@ -136,8 +209,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             foreach (var openOrder in openOrders)
             {
-                // make sure our internal collection is up to date as well
-                //UpdateCachedOpenOrder(openOrder.Id, openOrder);
                 orders.Add(ConvertOrder(openOrder));
             }
 
@@ -227,7 +298,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     throw new NotImplementedException("The Tradier order type " + order.OrderType + " is not implemented.");
             }
 
-            qcOrder.Status = ConvertStatus(order.Status.ToEnum<OrderStatusType>());
+            qcOrder.Status = ConvertStatus(order.Status);
             qcOrder.BrokerId.Add(order.OrderId.ToStringInvariant());
             return qcOrder;
         }
@@ -279,5 +350,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     throw new ArgumentOutOfRangeException();
             }
         }
+
+        private Models.OrderType ConvertQCOrderTypeToExchange(Orders.OrderType orderType) => orderType switch
+        {
+            Orders.OrderType.Market => Models.OrderType.Market,
+            Orders.OrderType.Limit => Models.OrderType.Limit,
+            Orders.OrderType.StopLimit => Models.OrderType.StopLimit,
+            _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderType {nameof(orderType)}")
+        };
+
+        private InstructionType ConvertQCOrderDirectionToExchange(OrderDirection orderDirection) => orderDirection switch
+        {
+            OrderDirection.Buy => InstructionType.Buy,
+            OrderDirection.Sell => InstructionType.Sell,
+            _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderDirection {nameof(orderDirection)}")
+        };
     }
 }

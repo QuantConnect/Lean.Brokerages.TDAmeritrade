@@ -50,7 +50,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public bool Editable { get; set; }
 
         [JsonProperty(PropertyName = "status")]
-        public string Status { get; set; } = string.Empty;
+        public OrderStatusType Status { get; set; }
 
         [JsonProperty(PropertyName = "enteredTime")]
         public string EnteredTime { get; set; } = string.Empty;

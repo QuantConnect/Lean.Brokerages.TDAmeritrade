@@ -412,15 +412,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="orderLegCollectionModels">Market</param>
         /// <param name="complexOrderStrategyType">Limit</param>
         /// <param name="price">Limit</param>
+        /// <param name="activationPrice">Stop Limit</param>
         /// <returns></returns>
-        public IEnumerable<OrderModel> PostPlaceOrder(
+        private string PostPlaceOrder(
             OrderType orderType,
             SessionType sessionType,
             DurationType durationType,
             OrderStrategyType orderStrategyType,
             List<PlaceOrderLegCollectionModel> orderLegCollectionModels,
             ComplexOrderStrategyType? complexOrderStrategyType = null,
-            decimal price = 0m)
+            decimal price = 0m,
+            decimal stopPrice = 0m)
         {
             var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.POST);
 
@@ -438,11 +440,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             body["orderStrategyType"] = orderStrategyType.GetEnumMemberValue();
             body["orderLegCollection"] = orderLegCollectionModels;
 
+            if(orderType == OrderType.StopLimit)
+                body["stopPrice"] = stopPrice;
+
             request.AddJsonBody(JsonConvert.SerializeObject(body));
 
-            Execute<string>(request); // Place Order
-
-            return GetOrdersByPath(orderLegCollectionModels.Count); // Get Order Detail
+            return Execute<string>(request); // Place Order
         }
 
         public bool CancelOrder(string orderNumber, string? accountNumber = null)

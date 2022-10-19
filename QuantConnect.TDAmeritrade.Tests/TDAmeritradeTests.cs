@@ -3,6 +3,8 @@ using QuantConnect.Configuration;
 using QuantConnect.Securities;
 using NodaTime;
 using QuantConnect.Data.Market;
+using QuantConnect.Orders;
+using OrderType = QuantConnect.Brokerages.TDAmeritrade.Models.OrderType;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
@@ -18,6 +20,107 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         [OneTimeSetUp]
         public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null);
+
+        [TestCase("AAPL", Resolution.Minute)]
+        [TestCase("AAPL", Resolution.Hour)]
+        [TestCase("AAPL", Resolution.Daily)]
+        public void TestHistoryProvider_GetHistory(string ticker, Resolution resolution)
+        {
+            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
+
+            DateTime startDateTime = DateTime.UtcNow.AddDays(-2.0);
+            DateTime endDateTime = DateTime.UtcNow;
+
+            var historyRequest = new HistoryRequest(
+                new SubscriptionDataConfig(typeof(TradeBar), symbol, resolution, DateTimeZone.Utc, DateTimeZone.Utc, true, true, true),
+                SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
+                startDateTime,
+                endDateTime);
+
+            var histories = _brokerage.GetHistory(historyRequest);
+
+            Assert.IsNotEmpty(histories);
+
+            var history = histories.FirstOrDefault();
+
+            Assert.IsNotNull(history);
+
+            Assert.Greater(history.Price, 0m);
+            Assert.Greater(history.Value, 0m);
+            Assert.That(history.Symbol.Value, Is.EqualTo(ticker).NoClip);
+
+            Assert.IsTrue(history.DataType == MarketDataType.TradeBar);
+
+            TradeBar historyBar = (TradeBar)history;
+
+            Assert.Greater(historyBar.Low, 0m);
+            Assert.Greater(historyBar.Close, 0m);
+            Assert.Greater(historyBar.High, 0m);
+            Assert.Greater(historyBar.Open, 0m);
+
+        }
+
+        [Test]
+        public void GetAccountHoldings()
+        {
+            var res = _brokerage.GetAccountHoldings();
+
+            Assert.IsNotNull(res);
+            Assert.Greater(res.Count, 0);
+        }
+
+        [Test]
+        public void GetOpenOrders()
+        {
+            var orders = _brokerage.GetOpenOrders();
+
+            Assert.IsNotNull(orders);
+        }
+
+        [Ignore("Ignore to save cash")]
+        [Test]
+        public void PlaceOrderMarket()
+        {
+            var symbol = Symbols.LODE;
+
+            var order = new MarketOrder(symbol, 1, DateTime.UtcNow);
+
+            var isPlaceOrder = _brokerage.PlaceOrder(order);
+
+            Assert.IsTrue(isPlaceOrder);
+        }
+
+        [Ignore("Ignore to save cash")]
+        [Test]
+        public void PlaceOrderLimit()
+        {
+            var symbol = Symbols.LODE;
+
+            var price = _brokerage.GetQuote(symbol.Value).LastPrice;
+            
+            var order = new LimitOrder(symbol, 1, price + (price * 0.1m), DateTime.UtcNow);
+
+            var isPlaceOrder = _brokerage.PlaceOrder(order);
+
+            Assert.IsTrue(isPlaceOrder);
+        }
+
+        //[Ignore("Ignore to save cash")]
+        [Test]
+        public void PlaceOrderStopLimit()
+        {
+            var symbol = Symbols.LODE;
+
+            var price = _brokerage.GetQuote(symbol.Value).LastPrice;
+
+            var order = new StopLimitOrder(symbol, 1, price + (price * 0.1m), price + (price * 0.2m), DateTime.UtcNow);
+
+            var isPlaceOrder = _brokerage.PlaceOrder(order);
+
+            Assert.IsTrue(isPlaceOrder);
+        }
+
+        #region REST API
 
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
@@ -105,45 +208,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsNotNull(history);
         }
 
-        [TestCase("AAPL", Resolution.Minute)]
-        [TestCase("AAPL", Resolution.Hour)]
-        [TestCase("AAPL", Resolution.Daily)]
-        public void TestHistoryProvider_GetHistory(string ticker, Resolution resolution)
-        {
-            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
-
-            DateTime startDateTime = DateTime.UtcNow.AddDays(-2.0);
-            DateTime endDateTime = DateTime.UtcNow;
-
-            var historyRequest = new HistoryRequest(
-                new SubscriptionDataConfig(typeof(TradeBar), symbol, resolution, DateTimeZone.Utc, DateTimeZone.Utc, true, true, true), 
-                SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc), 
-                startDateTime,
-                endDateTime);
-
-            var histories = _brokerage.GetHistory(historyRequest);
-
-            Assert.IsNotEmpty(histories);
-
-            var history = histories.FirstOrDefault();
-
-            Assert.IsNotNull(history);
-
-            Assert.Greater(history.Price, 0m);
-            Assert.Greater(history.Value, 0m);
-            Assert.That(history.Symbol.Value, Is.EqualTo(ticker).NoClip);
-
-            Assert.IsTrue(history.DataType == MarketDataType.TradeBar);
-
-            TradeBar historyBar = (TradeBar)history;
-
-            Assert.Greater(historyBar.Low, 0m);
-            Assert.Greater(historyBar.Close, 0m);
-            Assert.Greater(historyBar.High, 0m);
-            Assert.Greater(historyBar.Open, 0m);
-
-        }
-
         [TestCase("AAPL")] // EQUITY
         [TestCase("VGHAX")] // MUTUAL_FUND
         public void GetQuote(string symbol)
@@ -228,22 +292,12 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         }
 
         [Test]
-        public void GetAccountHoldings()
-        {
-            var res = _brokerage.GetAccountHoldings();
-
-            Assert.IsNotNull(res);
-            Assert.Greater(res.Count, 0);
-        }
-
-        [Test]
         public void GetOrdersByPath()
         {
             var currentDay = DateTime.Now;
             var order = _brokerage.GetOrdersByPath(10, toEnteredTime: currentDay).First();
 
             Assert.IsNotNull(order);
-            Assert.IsNotEmpty(order.Status);
             Assert.Greater(order.AccountId, 0);
             Assert.GreaterOrEqual(order.Price, 0);
             Assert.IsNotEmpty(order.OrderType);
@@ -260,7 +314,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             var order = _brokerage.GetOrder(orderNumber);
 
             Assert.IsNotNull(order);
-            Assert.IsNotEmpty(order.Status);
             Assert.Greater(order.AccountId, 0);
             Assert.Greater(order.Price, 0);
             Assert.IsNotEmpty(order.OrderType);
@@ -289,14 +342,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             var res = _brokerage.CancelOrder(orderNumber);
 
             Assert.IsFalse(res);
-        }
-
-        [Test]
-        public void GetOpenOrders()
-        {
-            var orders = _brokerage.GetOpenOrders();
-
-            Assert.IsNotNull(orders);
         }
 
         [TestCase(MarketType.OPTION)]
@@ -363,46 +408,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsNotEmpty(transactions.First().Instrument.Cusip);
         }
 
-        [Ignore("Market hasn't completed yet")]
-        [TestCase(OrderType.Market, InstructionType.Buy, 1, "BLZE")]
-        public void PostOrderMarket(OrderType orderType, InstructionType instructionType, decimal quantity, string symbol)
-        {
-            var session = SessionType.Normal;
-            var duration = DurationType.Day;
-            var orderStrategyType = OrderStrategyType.Single;
-
-            PlaceOrderLegCollectionModel orderLegCollectionModel = new(instructionType, quantity, new InstrumentPlaceOrderModel(symbol, "EQUITY"));
-            //OrderLegCollectionModel orderLegCollectionModel2 = new(InstructionType.Buy, 10, new InstrumentPlaceOrderModel("CBTRP", "EQUITY"));
-
-            List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
-            orderLegCollectionModels.Add(orderLegCollectionModel);
-            //orderLegCollectionModels.Add(orderLegCollectionModel2);
-
-            var order = _brokerage.PostPlaceOrder(orderType, session, duration, orderStrategyType, orderLegCollectionModels);
-
-            Assert.IsNotNull(order);
-        }
-
-        [Ignore("Limit hasn't completed yet")]
-        [TestCase(OrderType.Limit, 0.0003, InstructionType.Buy, 1, "CBTRP")]
-        [TestCase(OrderType.Limit, 4.6, InstructionType.Sell, 1, "BLZE")]
-        [TestCase(OrderType.Limit, 4.55, InstructionType.Buy, 1, "BLZE")]
-        public void PostOrderLimit(OrderType orderType, decimal price, InstructionType instructionType, decimal quantity, string symbol)
-        {
-            var session = SessionType.Normal;
-            var duration = DurationType.Day;
-            var orderStrategyType = OrderStrategyType.Single;
-            var complexOrderStrategyType = ComplexOrderStrategyType.None;
-
-            PlaceOrderLegCollectionModel orderLegCollectionModel = new(instructionType, quantity, new InstrumentPlaceOrderModel(symbol, "EQUITY"));
-
-            List<PlaceOrderLegCollectionModel> orderLegCollectionModels = new();
-            orderLegCollectionModels.Add(orderLegCollectionModel);
-
-            var order = _brokerage.PostPlaceOrder(orderType, session, duration, orderStrategyType, orderLegCollectionModels, complexOrderStrategyType, price);
-
-            Assert.IsNotNull(order);
-        }
-
+        #endregion
     }
 }

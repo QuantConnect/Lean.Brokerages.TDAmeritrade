@@ -34,6 +34,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private readonly object _lockAccessCredentials = new object();
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
+        private readonly TDAmeritradeSymbolMapper _symbolMapper = new();
 
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
         { }

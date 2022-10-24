@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Data;
+using QuantConnect.Data.Market;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
 using System.Collections.Concurrent;
@@ -14,7 +15,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         private int _counter;
         private SemaphoreSlim _slim = new SemaphoreSlim(1);
-        private readonly ConcurrentDictionary<string, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<string, DefaultOrderBook>();
+        private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -45,17 +46,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 if (!symbol.Value.Contains("universe", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    if (!_subscribedTickers.ContainsKey(symbol.Value))
+                    if (!_subscribedTickers.ContainsKey(symbol))
                     {
-                        _subscribedTickers.TryAdd(symbol.Value, new DefaultOrderBook(symbol));
+                        _subscribedTickers.TryAdd(symbol, new DefaultOrderBook(symbol));
                         symbolsAdded = true;
+                        _symbolMapper.GetWebsocketSymbol(symbol);
                     }
                 }
             }
 
             if (symbolsAdded)
             {
-                SubscribeToLevelOne(_subscribedTickers.Keys.Select(x => x).ToArray());
+                SubscribeToLevelOne(_subscribedTickers.Keys.Select(x => x.Value).ToArray());
             }
 
             return true;
@@ -77,9 +79,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 if (!symbol.IsCanonical())
                 {
-                    if (_subscribedTickers.ContainsKey(symbol.Value))
+                    if (_subscribedTickers.ContainsKey(symbol))
                     {
-                        _subscribedTickers.TryRemove(symbol.Value, out var removedSymbol);
+                        _subscribedTickers.TryRemove(symbol, out var removedSymbol);
                         removedSymbols.Add(symbol.Value);
                         symbolsRemoved = true;
                     }
@@ -228,7 +230,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Parameters = new
                         {
                             keys = $"{string.Join(",", symbols)}",
-                            fields = "0,1,2,3,4,5,6,7,8"
+                            fields = "0,1,2,3,4,5,6,7,8,9,10,16"
                             #region Description Fields
                             /* 0 - Ticker symbol in upper case.
                              * 1 - Bid Price, Current Best Bid Price
@@ -239,6 +241,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                              * 6 - Ask ID, Exchange with the best ask
                              * 7 - Bid ID, Exchange with the best bid
                              * 8 - Total Volume, Aggregated shares traded throughout the day, including pre/post market hours.
+                             * 9 - Last Size, Number of shares traded with last trade
+                             * 10 - Trade Time, Trade time of the last trade
+                             * 16 - Exchange ID, Primary "listing" Exchange
                              */
                             #endregion
                         }
@@ -256,7 +261,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
-{
+                {
                     new StreamRequestModel
                     {
                         Service = "QUOTE",
@@ -269,7 +274,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                             keys = $"{string.Join(",", symbols)}"
                         }
                     }
-}
+                }
             };
 
             WebSocket.Send(JsonConvert.SerializeObject(request));
@@ -331,13 +336,42 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void ParseQuoteLevelOneData(JToken content)
         {
-            foreach (var symbol in content)
+            var levelOneData = content.ToObject<List<LevelOneResponseModel>>() ?? new List<LevelOneResponseModel>(0);
+            foreach (var symbol in levelOneData)
             {
-                var symbolOrderBook = _subscribedTickers[symbol["key"].ToString()];
+                var symbolLean = _symbolMapper.GetSymbolFromWebsocket(symbol.Symbol);
 
-                symbolOrderBook.UpdateBidRow(symbol["1"].Value<decimal>(), symbol["4"].Value<decimal>());
-                symbolOrderBook.UpdateAskRow(symbol["2"].Value<decimal>(), symbol["5"].Value<decimal>());
+                DefaultOrderBook symbolOrderBook;
+                if (!_subscribedTickers.TryGetValue(symbolLean, out symbolOrderBook))
+                    continue;
+
+                if (symbol.BidPrice > 0)
+                    symbolOrderBook.UpdateBidRow(symbol.BidPrice, symbol.BidSize);
+
+                if(symbol.AskPrice > 0)
+                    symbolOrderBook.UpdateAskRow(symbol.AskPrice, symbol.AskSize);
+
+                if(symbol.LastPrice > 0 && symbol.LastSize > 0)
+                {
+                    var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
+                    var exchange = ConvertIDExchangeToFullName(symbol.ExchangeID);
+                    var trade = new Tick(tradeTime, symbolLean, "", exchange, symbol.LastSize, symbol.LastPrice);
+                    _aggregator.Update(trade);
+                }
             }
         }
+
+        private string ConvertIDExchangeToFullName(char exchangeID) => exchangeID switch
+        {
+            'n' => "NYSE",
+            'q' => "NASDAQ",
+            'p' => "PACIFIC",
+            'g' => "AMEX_INDEX",
+            'm' => "MUTUAL_FUND",
+            '9' => "PINK_SHEET",
+            'a' => "AMEX",
+            'u' => "OTCBB",
+            'x' => "INDICES"
+        };
     }
 }

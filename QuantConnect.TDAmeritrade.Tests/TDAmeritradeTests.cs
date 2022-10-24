@@ -4,22 +4,36 @@ using QuantConnect.Securities;
 using NodaTime;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
-using OrderType = QuantConnect.Brokerages.TDAmeritrade.Models.OrderType;
+using QuantConnect.Interfaces;
+using QuantConnect.Logging;
+using QuantConnect.Lean.Engine.DataFeeds;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
-    public class TDAmeritradeTests
+    public partial class TDAmeritradeTests : BrokerageTests
     {
-        private TDAmeritradeBrokerage _brokerage;
+        protected override Symbol Symbol => Symbol.Create("AAPL", SecurityType.Equity, Market.USA);
 
-        private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
-        private readonly string _callbackUrl = Config.Get("tdameritrade-callback-url");
-        private readonly string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
-        private readonly string _refreshToken = Config.Get("tdameritrade-refresh-token");
-        private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
+        protected override SecurityType SecurityType => SecurityType.Equity;        
 
-        [OneTimeSetUp]
-        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null);
+        protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
+        {
+            string _consumerKey = Config.Get("tdameritrade-consumer-key");
+            string _callbackUrl = Config.Get("tdameritrade-callback-url");
+            string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
+            string _refreshToken = Config.Get("tdameritrade-refresh-token");
+            string _accountNumber = Config.Get("tdameritrade-account-number");
+
+            return new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null, new AggregationManager());
+        }
+
+        protected override bool IsAsync() => true;
+        protected override bool IsCancelAsync() => true;
+
+        protected override decimal GetAskPrice(Symbol symbol)
+        {
+            throw new NotImplementedException();
+        }
 
         [TestCase("AAPL", Resolution.Minute)]
         [TestCase("AAPL", Resolution.Hour)]
@@ -37,7 +51,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                 startDateTime,
                 endDateTime);
 
-            var histories = _brokerage.GetHistory(historyRequest);
+            var histories = Brokerage.GetHistory(historyRequest);
 
             Assert.IsNotEmpty(histories);
 
@@ -63,7 +77,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetAccountHoldings()
         {
-            var res = _brokerage.GetAccountHoldings();
+            var res = Brokerage.GetAccountHoldings();
 
             Assert.IsNotNull(res);
             Assert.Greater(res.Count, 0);
@@ -72,7 +86,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetOpenOrders()
         {
-            var orders = _brokerage.GetOpenOrders();
+            var orders = Brokerage.GetOpenOrders();
 
             Assert.IsNotNull(orders);
         }
@@ -85,7 +99,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
             var order = new MarketOrder(symbol, 1, DateTime.UtcNow);
 
-            var isPlaceOrder = _brokerage.PlaceOrder(order);
+            var isPlaceOrder = Brokerage.PlaceOrder(order);
 
             Assert.IsTrue(isPlaceOrder);
         }
@@ -96,11 +110,11 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         {
             var symbol = Symbols.LODE;
 
-            var price = _brokerage.GetQuote(symbol.Value).LastPrice;
-            
+            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
+
             var order = new LimitOrder(symbol, 1, price + (price * 0.1m), DateTime.UtcNow);
 
-            var isPlaceOrder = _brokerage.PlaceOrder(order);
+            var isPlaceOrder = Brokerage.PlaceOrder(order);
 
             Assert.IsTrue(isPlaceOrder);
         }
@@ -111,11 +125,11 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         {
             var symbol = Symbols.LODE;
 
-            var price = _brokerage.GetQuote(symbol.Value).LastPrice;
+            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
 
             var order = new StopLimitOrder(symbol, 1, price + (price * 0.1m), price + (price * 0.2m), DateTime.UtcNow);
 
-            var isPlaceOrder = _brokerage.PlaceOrder(order);
+            var isPlaceOrder = Brokerage.PlaceOrder(order);
 
             Assert.IsTrue(isPlaceOrder);
         }
@@ -125,7 +139,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("037833100")] // Apple Inc. [AAPL]
         public void GetInstrumentByCUSIP(string cusip)
         {
-            var instrument = _brokerage.GetInstrumentByCUSIP(cusip);
+            var instrument = ((TDAmeritradeBrokerage)Brokerage).GetInstrumentByCUSIP(cusip);
 
             Assert.IsNotNull(instrument);
             Assert.IsNotEmpty(instrument.Cusip);
@@ -139,7 +153,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("AAPL", ProjectionType.Fundamental)]
         public void GetSearchInstrument(string symbol, ProjectionType projectionType)
         {
-            var instrument = _brokerage.GetSearchInstruments(symbol, projectionType);
+            var instrument = ((TDAmeritradeBrokerage)Brokerage).GetSearchInstruments(symbol, projectionType);
 
             Assert.IsNotNull(instrument);
             Assert.IsNotEmpty(instrument.Cusip);
@@ -203,7 +217,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         {
             var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
 
-            var history = _brokerage.GetPriceHistory(symbol);
+            var history = ((TDAmeritradeBrokerage)Brokerage).GetPriceHistory(symbol);
 
             Assert.IsNotNull(history);
         }
@@ -212,7 +226,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("VGHAX")] // MUTUAL_FUND
         public void GetQuote(string symbol)
         {
-            var quoteData = _brokerage.GetQuote(symbol);
+            var quoteData = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol);
 
             Assert.IsNotEmpty(quoteData.Symbol);
         }
@@ -220,7 +234,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("AAPL", "VGHAX")] // EQUITY, MUTUAL_FUND
         public void GetQuotes(string symbol1, string symbol2)
         {
-            var quoteData = _brokerage.GetQuotes(symbol1, symbol2);
+            var quoteData = ((TDAmeritradeBrokerage)Brokerage).GetQuotes(symbol1, symbol2);
 
             Assert.That(quoteData.Count(), Is.EqualTo(2));
         }
@@ -228,9 +242,9 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetSignInUrl()
         {
-            string expected = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=http%3a%2f%2flocalhost&client_id={_consumerKey}%40AMER.OAUTHAP";
+            string expected = $"https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=http%3a%2f%2flocalhost&client_id={Config.Get("tdameritrade-consumer-key")}%40AMER.OAUTHAP";
 
-            var url = _brokerage.GetSignInUrl();
+            var url = ((TDAmeritradeBrokerage)Brokerage).GetSignInUrl();
 
             Assert.IsNotNull(url);
             Assert.That(url, Is.EqualTo(expected));
@@ -240,7 +254,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetRefreshToken()
         {
-            var res = _brokerage.PostAccessToken(GrantType.AuthorizationCode, _codeFromUrl);
+            var res = ((TDAmeritradeBrokerage)Brokerage).PostAccessToken(GrantType.AuthorizationCode, Config.Get("tdameritrade-code-from-url"));
 
             Assert.IsNotNull(res);
         }
@@ -248,16 +262,16 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void UpdateAccessToken()
         {
-            var res = _brokerage.PostAccessToken(GrantType.RefreshToken, string.Empty);
-            
+            var res = ((TDAmeritradeBrokerage)Brokerage).PostAccessToken(GrantType.RefreshToken, string.Empty);
+
             Assert.IsNotNull(res);
         }
 
         [Test]
         public void GetAccounts()
         {
-            var res = _brokerage.GetAccounts();
-                
+            var res = ((TDAmeritradeBrokerage)Brokerage).GetAccounts();
+
             Assert.IsNotNull(res);
             Assert.Greater(res[0].SecuritiesAccount.InitialBalances.CashBalance, 0);
             Assert.Greater(res[0].SecuritiesAccount.InitialBalances.Equity, 0);
@@ -275,7 +289,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetAccount()
         {
-            var res = _brokerage.GetAccount(_accountNumber);
+            var res = ((TDAmeritradeBrokerage)Brokerage).GetAccount(Config.Get("tdameritrade-account-number"));
 
             Assert.IsNotNull(res);
             Assert.Greater(res.SecuritiesAccount.InitialBalances.CashBalance, 0);
@@ -295,7 +309,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         public void GetOrdersByPath()
         {
             var currentDay = DateTime.Now;
-            var order = _brokerage.GetOrdersByPath(10, toEnteredTime: currentDay).First();
+            var order = ((TDAmeritradeBrokerage)Brokerage).GetOrdersByPath(10, toEnteredTime: currentDay).First();
 
             Assert.IsNotNull(order);
             Assert.Greater(order.AccountId, 0);
@@ -311,7 +325,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("9556056706")]
         public void GetOrdersById(string orderNumber)
         {
-            var order = _brokerage.GetOrder(orderNumber);
+            var order = ((TDAmeritradeBrokerage)Brokerage).GetOrder(orderNumber);
 
             Assert.IsNotNull(order);
             Assert.Greater(order.AccountId, 0);
@@ -328,7 +342,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetUserPrincipals()
         {
-            var userPrincipals = _brokerage.GetUserPrincipals();
+            var userPrincipals = ((TDAmeritradeBrokerage)Brokerage).GetUserPrincipals();
 
             Assert.IsNotNull(userPrincipals);
         }
@@ -339,7 +353,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase("9558160576")]
         public void CancelOrder(string orderNumber)
         {
-            var res = _brokerage.CancelOrder(orderNumber);
+            var res = ((TDAmeritradeBrokerage)Brokerage).CancelOrder(orderNumber);
 
             Assert.IsFalse(res);
         }
@@ -351,7 +365,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase(MarketType.FOREX)]
         public void GetHoursForSingleMarket(MarketType marketType)
         {
-            var hoursOption = _brokerage.GetHoursForSingleMarket(marketType);
+            var hoursOption = ((TDAmeritradeBrokerage)Brokerage).GetHoursForSingleMarket(marketType);
 
             Assert.IsNotNull(hoursOption);
 
@@ -375,7 +389,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase(MarketType.FUTURE, MarketType.OPTION, MarketType.BOND, MarketType.FOREX, MarketType.EQUITY)]
         public void GetHoursForMultipleMarkets(params MarketType[] marketTypes)
         {
-            var hoursOption = _brokerage.GetHoursForMultipleMarkets(marketTypes);
+            var hoursOption = ((TDAmeritradeBrokerage)Brokerage).GetHoursForMultipleMarkets(marketTypes);
 
             Assert.IsNotNull(hoursOption);
             Assert.That(hoursOption.Count, Is.EqualTo(marketTypes.Length));
@@ -388,7 +402,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase(IndexMoverType.SPX_X, DirectionType.Up, ChangeType.Value)]
         public void GetMovers(IndexMoverType indexMoverType, DirectionType directionType, ChangeType changeType)
         {
-            var mover = _brokerage.GetMovers(indexMoverType);
+            var mover = ((TDAmeritradeBrokerage)Brokerage).GetMovers(indexMoverType, directionType, changeType);
 
             Assert.IsNotNull(mover);
             Assert.Greater(mover.Count, 0);
@@ -399,7 +413,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase(TransactionType.BUY_ONLY, null)]
         public void GetTransaction(TransactionType transactionType, string symbol)
         {
-            var transactions = _brokerage.GetTransactions(transactionType: transactionType, symbol: symbol);
+            var transactions = ((TDAmeritradeBrokerage)Brokerage).GetTransactions(transactionType: transactionType, symbol: symbol);
 
             Assert.IsNotNull(transactions);
             Assert.Greater(transactions.Count(), 0);
@@ -409,5 +423,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         }
 
         #endregion
+
+
     }
 }

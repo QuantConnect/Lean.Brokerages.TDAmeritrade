@@ -1,27 +1,47 @@
 ﻿using QuantConnect.Configuration;
+using QuantConnect.Data;
+using QuantConnect.Data.Market;
+using QuantConnect.Interfaces;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Logging;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
-    public class TDAmeritradeWebSocketTests
+    public partial class TDAmeritradeTests
     {
-        private TDAmeritradeBrokerage _brokerage;
-
-        private readonly string _consumerKey = Config.Get("tdameritrade-consumer-key");
-        private readonly string _callbackUrl = Config.Get("tdameritrade-callback-url");
-        private readonly string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
-        private readonly string _refreshToken = Config.Get("tdameritrade-refresh-token");
-        private readonly string _accountNumber = Config.Get("tdameritrade-account-number");
-
-        [OneTimeSetUp]
-        public void Setup() => _brokerage = new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, null);
-
         [Test]
-        public void GetLoginRequstWS()
+        public void StreamsData()
         {
-            var row = _brokerage.Login();
+            var cancelationToken = new CancellationTokenSource();
+            var brokerage = (TDAmeritradeBrokerage)Brokerage;
 
-            Assert.IsNotNull(row);
-            Assert.IsNotEmpty(row);
+            var symbol = Symbols.AAPL;
+            var symbol2 = Symbols.IBM;
+
+            var configs = new[] {
+                GetSubscriptionDataConfig<QuoteBar>(symbol, Resolution.Tick),
+                GetSubscriptionDataConfig<TradeBar>(symbol2, Resolution.Tick)
+                };
+
+            foreach (var config in configs)
+            {
+                ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
+                    cancelationToken,
+                    (baseData) =>
+                    {
+                        if (baseData != null) { Log.Trace($"{baseData}"); }
+                    });
+            }
+
+            Thread.Sleep(10000);
+
+            foreach (var config in configs)
+                brokerage.Unsubscribe(config);
+
+            Thread.Sleep(5000);
+
+            cancelationToken.Cancel();
         }
     }
 }

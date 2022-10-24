@@ -1,4 +1,6 @@
 ﻿using QuantConnect.Brokerages.TDAmeritrade.Models;
+using QuantConnect.Configuration;
+using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
@@ -39,7 +41,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var refreshToken = Read<string>(job.BrokerageData, "tdameritrade-refresh-token", errors);
             var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
-            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm, algorithm.Portfolio);
+            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm, algorithm.Portfolio,
+                Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false));
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

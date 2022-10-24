@@ -45,7 +45,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string codeFromUrl,
             string accountNumber,
             IAlgorithm algorithm,
-            ISecurityProvider securityProvider) : base("TD Ameritrade")
+            ISecurityProvider securityProvider,
+            IDataAggregator aggregator) : base("TD Ameritrade")
         {
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
@@ -54,6 +55,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _accountNumber = accountNumber;
             _algorithm = algorithm;
             _securityProvider = securityProvider;
+            _aggregator = aggregator;
 
             Initialize();
             //ValidateSubscription(); // Quant Connect api permission
@@ -260,9 +262,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 
             var subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
+
             subscriptionManager.SubscribeImpl += (symbols, _) => Subscribe(symbols);
             subscriptionManager.UnsubscribeImpl += (symbols, _) => Unsubscribe(symbols);
             SubscriptionManager = subscriptionManager;
+
+            WebSocket.Open += (sender, args) => { Login(); };
+            WebSocket.Closed += (sender, args) => { LogOut(); };
 
             //ValidateSubscription(); // TODO: implement mthd
         }

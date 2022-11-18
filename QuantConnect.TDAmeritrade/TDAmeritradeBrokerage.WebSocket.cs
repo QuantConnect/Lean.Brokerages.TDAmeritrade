@@ -8,6 +8,7 @@ using QuantConnect.Packets;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Web;
+using System.Xml.Serialization;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
@@ -16,6 +17,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private int _counter;
         private SemaphoreSlim _slim = new SemaphoreSlim(1);
         private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
+        private bool _isConnectToAccountActivityChanel = default;
+        private bool _isLogIn = default;
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -34,12 +37,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if (WebSocket != null && WebSocket.IsOpen)
             {
-                WebSocket.Close();
+                LogOut();
             }
         }
 
         protected override bool Subscribe(IEnumerable<Symbol> symbols)
         {
+            if (_isLogIn && !_isConnectToAccountActivityChanel)
+            {
+                SubscribeToAccountActivity();
+                _isConnectToAccountActivityChanel = true;
+            }
+
+
             var symbolsAdded = false;
 
             foreach (var symbol in symbols)
@@ -254,6 +264,46 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             WebSocket.Send(JsonConvert.SerializeObject(request));
         }
 
+        /// <summary>
+        /// This service is used to request streaming updates for one or more accounts associated with the logged in User ID.  
+        /// Common usage would involve issuing the OrderStatus API request to get all transactions for an account, and subscribing to 
+        /// ACCT_ACTIVITY to get any updates. 
+        /// </summary>
+        private void SubscribeToAccountActivity()
+        {
+            var userPrincipals = GetUserPrincipals();
+            var accountActivityKey = GetStreamerSubscriptionKeys();
+
+            var request = new StreamRequestModelContainer
+            {
+                Requests = new StreamRequestModel[]
+                {
+                    new StreamRequestModel
+                    {
+                        Service = "ACCT_ACTIVITY",
+                        Command = "SUBS",
+                        Requestid = Interlocked.Increment(ref _counter),
+                        Account = userPrincipals.Accounts[0].AccountId,
+                        Source = userPrincipals.StreamerInfo.AppId,
+                        Parameters = new
+                        {
+                            keys = $"{accountActivityKey}",
+                            fields = "0,1,2,3"
+                            #region Description Fields
+                            /* 0 - Subscription Key
+                             * 1 - Account #
+                             * 2 - Message Type
+                             * 3 - Message Data
+                             */
+                            #endregion
+                        }
+                    }
+                }
+            };
+
+            WebSocket.Send(JsonConvert.SerializeObject(request));
+        }
+
         private void UnSubscribeToLevelOne(params string[] symbols)
         {
             var userPrincipals = GetUserPrincipals();
@@ -291,6 +341,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "QUOTE":
                     ParseQuoteLevelOneData(token["content"]);
                     break;
+                case "ACCT_ACTIVITY":
+                    ParseAccountActivity(token["content"]);
+                    break;
             }
         }
 
@@ -304,7 +357,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 case "LOGIN":
                     if (token["content"]["code"].Value<int>() != 0)
+                    {
                         Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleResponseData, Login: {token["content"]["msg"]}");
+                    }
+                    else
+                    {
+                        _isLogIn = true;
+                    }
                     break;
                 case "LOGOUT":
                     Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleResponseData, Logout: {token["content"]["msg"]}");
@@ -361,6 +420,77 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
+        private void ParseAccountActivity(JToken content)
+        {
+            var accountActivityData = content.ToObject<List<AccountActivityResponseModel>>()?.First();
+
+            if (!accountActivityData.HasValue)
+                return;
+
+            switch(accountActivityData.Value.MessageType)
+            {
+                case "SUBSCRIBED":
+                    Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivityData.Value.MessageData}");
+                    break;
+                case "ERROR":
+                    Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
+                    break;
+                case "BrokenTrade": // After an order was filled, the trade is reversed or "Broken" and the order is changed to Canceled.
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "ManualExecution": // The order is manually entered (and filled) by the broker.  Usually due to some system issue.
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderActivation": // A Stop order has been Activated
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received (You will also get a UROUT for the original order)
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderCancelRequest": // A request to cancel an order has been received
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderEntryRequest": // A new order has been submitted
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderFill": // An order has been completely filled
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderPartialFill": // An order has been partial filled
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "OrderRejection": // An order was rejected
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "TooLateToCancel": // A request to cancel an order has been received but the order cannot be canceled either because it was already canceled, filled, or for some other reason
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+                case "UROUT": // Indicates "You Are Out" - that the order has been canceled
+                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    break;
+            }
+        }
+
+        private void OnExecutionReport(string xml)
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(OrderEntryRequestMessage));
+
+            OrderEntryRequestMessage result = default;
+            using (TextReader reader = new StringReader(xml.Trim()))
+            {
+                try
+                {
+                    result = serializer.Deserialize(reader) as OrderEntryRequestMessage;
+                }
+                catch(Exception ex)
+                {
+                    Log.Error($"Not Deserialzie =( : {ex.Message}");
+                }
+            }
+
+            Log.Trace($"result: {result}");
+        }
+
         private string ConvertIDExchangeToFullName(char exchangeID) => exchangeID switch
         {
             'n' => "NYSE",
@@ -371,7 +501,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             '9' => "PINK_SHEET",
             'a' => "AMEX",
             'u' => "OTCBB",
-            'x' => "INDICES"
+            'x' => "INDICES",
+            _ => "unknown"
         };
     }
 }

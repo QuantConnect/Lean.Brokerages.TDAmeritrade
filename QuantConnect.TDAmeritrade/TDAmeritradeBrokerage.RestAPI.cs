@@ -240,6 +240,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
+        /// SubscriptionKey for provided accounts or default accounts.
+        /// </summary>
+        /// <returns>SubscriptionKey</returns>
+        public string GetStreamerSubscriptionKeys()
+        {
+            var request = new RestRequest("userprincipals/streamersubscriptionkeys", Method.GET);
+
+            request.AddQueryParameter("accountIds", _accountNumber);
+
+            var keys = Execute<StreamerSubscriptionKeys[]>(request, "keys");
+
+            return keys[0].Key;
+        }
+
+        /// <summary>
         /// Retrieve market hours for specified markets
         /// </summary>
         public void GetHoursForMultipleMarkets()

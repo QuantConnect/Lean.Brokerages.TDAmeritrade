@@ -1,9 +1,11 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
+using QuantConnect.Brokerages.TDAmeritrade.Utils;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Logging;
+using QuantConnect.Orders;
 using QuantConnect.Packets;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
@@ -15,10 +17,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     public partial class TDAmeritradeBrokerage
     {
         private int _counter;
-        private SemaphoreSlim _slim = new SemaphoreSlim(1);
         private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
-        private bool _isConnectToAccountActivityChanel = default;
-        private bool _isLogIn = default;
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -43,13 +42,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         protected override bool Subscribe(IEnumerable<Symbol> symbols)
         {
-            if (_isLogIn && !_isConnectToAccountActivityChanel)
-            {
-                SubscribeToAccountActivity();
-                _isConnectToAccountActivityChanel = true;
-            }
-
-
             var symbolsAdded = false;
 
             foreach (var symbol in symbols)
@@ -84,7 +76,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private bool Unsubscribe(IEnumerable<Symbol> symbols)
         {
             var symbolsRemoved = false;
-            List<string> removedSymbols = new(); 
+            List<string> removedSymbols = new();
             foreach (var symbol in symbols)
             {
                 if (!symbol.IsCanonical())
@@ -128,7 +120,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error, Token is {token}");
                 return;
             }
-            
+
             var tokenRootName = ((JObject)token).Properties().First().Name;
 
             switch (tokenRootName)
@@ -198,6 +190,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 WebSocket.Send(JsonConvert.SerializeObject(request));
             }
+
+            // After login, we need to subscribe to account's Trade activity chanel
+            SubscribeToAccountActivity();
         }
 
         public void LogOut()
@@ -360,10 +355,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleResponseData, Login: {token["content"]["msg"]}");
                     }
-                    else
-                    {
-                        _isLogIn = true;
-                    }
                     break;
                 case "LOGOUT":
                     Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleResponseData, Logout: {token["content"]["msg"]}");
@@ -407,10 +398,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 if (symbol.BidPrice > 0)
                     symbolOrderBook.UpdateBidRow(symbol.BidPrice, symbol.BidSize);
 
-                if(symbol.AskPrice > 0)
+                if (symbol.AskPrice > 0)
                     symbolOrderBook.UpdateAskRow(symbol.AskPrice, symbol.AskSize);
 
-                if(symbol.LastPrice > 0 && symbol.LastSize > 0)
+                if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
                     var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
                     var exchange = ConvertIDExchangeToFullName(symbol.ExchangeID);
@@ -427,7 +418,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             if (!accountActivityData.HasValue)
                 return;
 
-            switch(accountActivityData.Value.MessageType)
+            switch (accountActivityData.Value.MessageType)
             {
                 case "SUBSCRIBED":
                     Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivityData.Value.MessageData}");
@@ -436,59 +427,140 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
                     break;
                 case "BrokenTrade": // After an order was filled, the trade is reversed or "Broken" and the order is changed to Canceled.
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "ManualExecution": // The order is manually entered (and filled) by the broker.  Usually due to some system issue.
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderActivation": // A Stop order has been Activated
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received (You will also get a UROUT for the original order)
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderCancelRequest": // A request to cancel an order has been received
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
                     break;
                 case "OrderEntryRequest": // A new order has been submitted
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    var newOrder = DeserializeXMLExecutionResponse<OrderEntryRequestMessage>(accountActivityData.Value.MessageData);
+                    HandleSubmitNewOrder(newOrder);
                     break;
                 case "OrderFill": // An order has been completely filled
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
                     break;
                 case "OrderPartialFill": // An order has been partial filled
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderRejection": // An order was rejected
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "TooLateToCancel": // A request to cancel an order has been received but the order cannot be canceled either because it was already canceled, filled, or for some other reason
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "UROUT": // Indicates "You Are Out" - that the order has been canceled
-                    OnExecutionReport(accountActivityData.Value.MessageData);
+                    DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
                     break;
             }
         }
 
-        private void OnExecutionReport(string xml)
+        private void HandleSubmitNewOrder(OrderEntryRequestMessage? order)
         {
-            XmlSerializer serializer = new XmlSerializer(typeof(OrderEntryRequestMessage));
+            if(order == null)
+            {
+                return;
+            }
 
-            OrderEntryRequestMessage result = default;
-            using (TextReader reader = new StringReader(xml.Trim()))
+            Order qcOrder;
+
+            var symbol = Symbol.Create(order.Order.Security.Symbol, SecurityType.Equity, Market.USA);
+            var quantity = WebSocketConverterExtension.ConvertQuantityExchangeToQC(order.Order.OriginalQuantity, order.Order.OrderInstructions);
+            var time = order.Order.OrderEnteredDateTime;
+
+            switch(order.Order.OrderType)
+            {
+                case OrderTypeWebSocket.Market:
+                    qcOrder = new MarketOrder(symbol, quantity, time);
+                    break;
+                case OrderTypeWebSocket.Limit:
+                    qcOrder = new LimitOrder(
+                        symbol,
+                        quantity,
+                        ((OrderEntryRequestMessageOrderOrderPricingLimit)order.Order.OrderPricing).Limit,
+                        time);
+                    break;
+                case OrderTypeWebSocket.Stop:
+                    qcOrder = new StopMarketOrder(
+                        symbol,
+                        quantity,
+                        ((OrderEntryRequestMessageOrderOrderPricingStopMarket)order.Order.OrderPricing).Stop,
+                        time);
+                    break;
+                case OrderTypeWebSocket.StopLimit:
+                    qcOrder = new StopLimitOrder(
+                        symbol,
+                        quantity,
+                        ((OrderEntryRequestMessageOrderOrderPricingStopLimit)order.Order.OrderPricing).Stop,
+                        ((OrderEntryRequestMessageOrderOrderPricingStopLimit)order.Order.OrderPricing).Limit,
+                        time);
+                    break;
+                default:
+                    throw new NotImplementedException("The Tradier order type " + order.Order.OrderType + " is not implemented.");
+            }
+
+            qcOrder.Status = OrderStatus.Submitted;
+            qcOrder.BrokerId.Add(order.Order.OrderKey.ToStringInvariant());
+
+            OnOrderEvent(new OrderEvent(qcOrder, DateTime.UtcNow, Orders.Fees.OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Submitted });
+            Log.Trace($"Order submitted successfully - OrderId: {order.Order.OrderKey.ToStringInvariant()}");
+        }
+
+        private void HandleOrderFill(OrderFillMessage? order)
+        {
+            if(order == null)
+            {
+                return;
+            }
+
+            OrderStatus orderStatus = OrderStatus.Filled;
+
+            var orderId = order.Order.OrderKey.ToStringInvariant();
+
+            var time = order.ExecutionInformation.Timestamp;
+
+            var orderQC = _orderProvider.GetOrderByBrokerageId(orderId);
+
+            if (orderQC == null)
+            {
+                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {orderId}");
+                return;
+            }
+
+            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event")
+            {
+                Status = orderStatus,
+                FillQuantity = order.ExecutionInformation.Quantity,
+                FillPrice = order.ExecutionInformation.ExecutionPrice
+            };
+
+            OnOrderEvent(orderEvent);
+        }
+
+        private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(T));
+
+            using (TextReader reader = new StringReader(xml))
             {
                 try
                 {
-                    result = serializer.Deserialize(reader) as OrderEntryRequestMessage;
+                    return (T?)serializer.Deserialize(reader);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
-                    Log.Error($"Not Deserialzie =( : {ex.Message}");
+                    Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage: : {ex.Message}");
                 }
             }
-
-            Log.Trace($"result: {result}");
+            return default;
         }
 
         private string ConvertIDExchangeToFullName(char exchangeID) => exchangeID switch

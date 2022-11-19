@@ -5,22 +5,23 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
     [Serializable()]
     [XmlType(AnonymousType = true, Namespace = "urn:xmlns:beb.ameritrade.com")]
     [XmlRoot(Namespace = "urn:xmlns:beb.ameritrade.com", IsNullable = false)]
-    public class OrderEntryRequestMessage
+    public class UROUTMessage
     {
-        public OrderGroupID OrderGroupID { get; set; }
+        public UROUTMessageOrderGroupID OrderGroupID { get; set; }
 
         public DateTime ActivityTimestamp { get; set; }
 
-        public OrderEntryRequestMessageOrder Order { get; set; }
+        public UROUTMessageOrder Order { get; set; }
 
-        public DateTime LastUpdated { get; set; }
+        public string OrderDestination { get; set; }
 
-        [XmlArrayItem("ConfirmText", IsNullable = false)]
-        public object[] ConfirmTexts { get; set; }
+        public string InternalExternalRouteInd { get; set; }
+
+        public byte CancelledQuantity { get; set; }
     }
 
     [Serializable()]
-    public class OrderGroupID
+    public class UROUTMessageOrderGroupID
     {
         public byte Firm { get; set; }
 
@@ -39,13 +40,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
 
     [Serializable()]
     [XmlType(TypeName = "EquityOrderT")]
-    public class OrderEntryRequestMessageOrder
+    public class UROUTMessageOrder
     {
-        public ulong OrderKey { get; set; } 
+        public ulong OrderKey { get; set; }
 
-        public OrderEntryRequestMessageOrderSecurity Security { get; set;  }
+        public UROUTMessageOrderSecurity Security { get; set; }
 
-        public OrderEntryRequestMessageOrderOrderPricing OrderPricing { get; set; }
+        public UROUTMessageOrderPricing OrderPricing { get; set; }
 
         public string OrderType { get; set; }
 
@@ -67,45 +68,59 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
 
         public string MarketCode { get; set; }
 
-        public OrderEntryRequestMessageOrderCharges Charges { get; set; }
-
         public ushort ClearingID { get; set; }
 
         public string SettlementInstructions { get; set; }
+
         public string EnteringDevice { get; set; }
     }
 
     [Serializable()]
-    public class OrderEntryRequestMessageOrderSecurity
+    public class UROUTMessageOrderSecurity
     {
-        public string CUSIP { get; set; }
+        public uint CUSIP { get; set; }
 
         public string Symbol { get; set; }
+
         public string SecurityType { get; set; }
     }
 
     [Serializable()]
-    [XmlType(TypeName = "LimitT")]
-    public class OrderEntryRequestMessageOrderOrderPricing
+    [XmlInclude(typeof(UROUTMessageOrderPricingLimit))]
+    [XmlInclude(typeof(UROUTMessageOrderPricingMarket))]
+    [XmlInclude(typeof(UROUTMessageOrderPricingStopMarket))]
+    [XmlInclude(typeof(UROUTMessageOrderPricingStopLimit))]
+    public abstract class UROUTMessageOrderPricing
     {
         public decimal Ask { get; set; }
 
         public decimal Bid { get; set; }
+    }
 
+    [Serializable()]
+    [XmlType(TypeName = "LimitT", Namespace = "urn:xmlns:beb.ameritrade.com")]
+    public class UROUTMessageOrderPricingLimit : UROUTMessageOrderPricing
+    {
         public decimal Limit { get; set; }
     }
 
     [Serializable()]
-    public class OrderEntryRequestMessageOrderCharges
+    [XmlType(TypeName = "MarketT", Namespace = "urn:xmlns:beb.ameritrade.com")]
+    public class UROUTMessageOrderPricingMarket : UROUTMessageOrderPricing
+    { }
+
+    [Serializable()]
+    [XmlType(TypeName = "StopT", Namespace = "urn:xmlns:beb.ameritrade.com")]
+    public class UROUTMessageOrderPricingStopMarket : UROUTMessageOrderPricing
     {
-        public OrderEntryRequestMessageOrderChargesCharge Charge { get; set; }
+        public decimal Stop { get; set; }
     }
 
     [Serializable()]
-    public class OrderEntryRequestMessageOrderChargesCharge
+    [XmlType(TypeName = "StopLimitT", Namespace = "urn:xmlns:beb.ameritrade.com")]
+    public class UROUTMessageOrderPricingStopLimit : UROUTMessageOrderPricing
     {
-        public string Type { get; set; }
-
-        public byte Amount { get; set; }
+        public decimal Limit { get; set; }
+        public decimal Stop { get; set; }
     }
 }

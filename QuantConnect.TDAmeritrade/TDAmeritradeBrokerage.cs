@@ -31,6 +31,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly IAlgorithm _algorithm;
         private ISecurityProvider _securityProvider;
         private readonly IDataAggregator _aggregator;
+        private readonly IOrderProvider _orderProvider;
 
         private readonly object _lockAccessCredentials = new object();
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
@@ -47,7 +48,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string accountNumber,
             IAlgorithm algorithm,
             ISecurityProvider securityProvider,
-            IDataAggregator aggregator) : base("TD Ameritrade")
+            IDataAggregator aggregator,
+            IOrderProvider orderProvider) : base("TD Ameritrade")
         {
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
@@ -57,6 +59,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _algorithm = algorithm;
             _securityProvider = securityProvider;
             _aggregator = aggregator;
+            _orderProvider = orderProvider;
 
             Initialize();
             //ValidateSubscription(); // Quant Connect api permission
@@ -158,20 +161,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, response));
                 return false;
             }
-
-            var orderResponse = GetOrdersByPath().First();
-            if (orderResponse.Status == OrderStatusType.Rejected)
-            {
-                var errorMessage = $"Reject reason: {orderResponse.StatusDescription}"; 
-                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, errorMessage));
-                return true;
-            }
-
-            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
-
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Submitted });
-            Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
 
             return true;
         }

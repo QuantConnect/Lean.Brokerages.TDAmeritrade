@@ -77,13 +77,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
                 case Models.OrderType.Limit:
                     qcOrder = new LimitOrder(symbol, quantity, order.Price, time);
                     break;
-                //case Domain.Enums.OrderType.Stop:
-                //    qcOrder = new StopMarketOrder(symbol, quantity, order..StopPrice, time);
-                //    break;
-
-                //case Domain.Enums.OrderType.StopLimit:
-                //    qcOrder = new StopLimitOrder(symbol, quantity, GetOrder(order.Id).StopPrice, order.Price, time);
-                //    break;
+                case Models.OrderType.Stop:
+                    qcOrder = new StopMarketOrder(symbol, quantity, order.StopPrice, time);
+                    break;
+                case Models.OrderType.StopLimit:
+                    qcOrder = new StopLimitOrder(symbol, quantity, order.StopPrice, order.Price, time);
+                    break;
                 default:
                     throw new NotImplementedException("The Tradier order type " + order.OrderType + " is not implemented.");
             }

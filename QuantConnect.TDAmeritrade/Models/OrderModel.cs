@@ -31,6 +31,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         [JsonProperty(PropertyName = "destinationLinkName")]
         public string DestinationLinkName { get; set; } = string.Empty;
 
+        [JsonProperty(PropertyName = "stopPrice")]
+        public decimal StopPrice { get; set; }
+
         [JsonProperty(PropertyName = "price")]
         public decimal Price { get; set; }
 

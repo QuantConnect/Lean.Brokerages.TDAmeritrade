@@ -154,9 +154,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 limitPrice.RoundToSignificantDigits(4),
                 stopPrice.RoundToSignificantDigits(4));
 
-            var orderFee = OrderFee.Zero;
             if (!string.IsNullOrEmpty(response))
             {
+                var orderFee = OrderFee.Zero;   
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = response });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, response));
                 return false;

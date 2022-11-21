@@ -175,7 +175,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "ADMIN",
                         Command = "LOGIN",
-                        Requestid = 1, // Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _counter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
@@ -427,19 +427,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
                     break;
                 case "BrokenTrade": // After an order was filled, the trade is reversed or "Broken" and the order is changed to Canceled.
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "ManualExecution": // The order is manually entered (and filled) by the broker.  Usually due to some system issue.
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderActivation": // A Stop order has been Activated
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received (You will also get a UROUT for the original order)
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderCancelRequest": // A request to cancel an order has been received
-                    DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
+                    var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
+                    HandleOrderCancelRequest(candelOrder);
                     break;
                 case "OrderEntryRequest": // A new order has been submitted
                     var newOrder = DeserializeXMLExecutionResponse<OrderEntryRequestMessage>(accountActivityData.Value.MessageData);
@@ -447,15 +444,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     break;
                 case "OrderFill": // An order has been completely filled
                     var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
+                    HandleOrderFill(orderFill);
                     break;
                 case "OrderPartialFill": // An order has been partial filled
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "OrderRejection": // An order was rejected
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "TooLateToCancel": // A request to cancel an order has been received but the order cannot be canceled either because it was already canceled, filled, or for some other reason
-                    //OnExecutionReport(accountActivityData.Value.MessageData);
                     break;
                 case "UROUT": // Indicates "You Are Out" - that the order has been canceled
                     DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
@@ -470,47 +465,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            Order qcOrder;
+            var qcOrder = _orderProvider.GetOrders().Last();
 
-            var symbol = Symbol.Create(order.Order.Security.Symbol, SecurityType.Equity, Market.USA);
-            var quantity = WebSocketConverterExtension.ConvertQuantityExchangeToQC(order.Order.OriginalQuantity, order.Order.OrderInstructions);
             var time = order.Order.OrderEnteredDateTime;
-
-            switch(order.Order.OrderType)
-            {
-                case OrderTypeWebSocket.Market:
-                    qcOrder = new MarketOrder(symbol, quantity, time);
-                    break;
-                case OrderTypeWebSocket.Limit:
-                    qcOrder = new LimitOrder(
-                        symbol,
-                        quantity,
-                        ((OrderEntryRequestMessageOrderOrderPricingLimit)order.Order.OrderPricing).Limit,
-                        time);
-                    break;
-                case OrderTypeWebSocket.Stop:
-                    qcOrder = new StopMarketOrder(
-                        symbol,
-                        quantity,
-                        ((OrderEntryRequestMessageOrderOrderPricingStopMarket)order.Order.OrderPricing).Stop,
-                        time);
-                    break;
-                case OrderTypeWebSocket.StopLimit:
-                    qcOrder = new StopLimitOrder(
-                        symbol,
-                        quantity,
-                        ((OrderEntryRequestMessageOrderOrderPricingStopLimit)order.Order.OrderPricing).Stop,
-                        ((OrderEntryRequestMessageOrderOrderPricingStopLimit)order.Order.OrderPricing).Limit,
-                        time);
-                    break;
-                default:
-                    throw new NotImplementedException("The Tradier order type " + order.Order.OrderType + " is not implemented.");
-            }
 
             qcOrder.Status = OrderStatus.Submitted;
             qcOrder.BrokerId.Add(order.Order.OrderKey.ToStringInvariant());
 
-            OnOrderEvent(new OrderEvent(qcOrder, DateTime.UtcNow, Orders.Fees.OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Submitted });
+            OnOrderEvent(new OrderEvent(qcOrder, time, Orders.Fees.OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
             Log.Trace($"Order submitted successfully - OrderId: {order.Order.OrderKey.ToStringInvariant()}");
         }
 
@@ -535,11 +497,41 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event")
+            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderFill")
             {
                 Status = orderStatus,
                 FillQuantity = order.ExecutionInformation.Quantity,
                 FillPrice = order.ExecutionInformation.ExecutionPrice
+            };
+
+            OnOrderEvent(orderEvent);
+        }
+
+        private void HandleOrderCancelRequest(OrderCancelRequestMessage? order)
+        {
+            if(order == null)
+            {
+                return;
+            }
+
+            OrderStatus orderStatus = OrderStatus.Canceled;
+
+            var orderId = order.Order.OrderKey.ToStringInvariant();
+
+            var time = order.LastUpdated;
+
+            var orderQC = _orderProvider.GetOrderByBrokerageId(orderId);
+
+            if (orderQC == null)
+            {
+                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderCancelRequest(): Unable to locate order with BrokerageId: {orderId}");
+                return;
+            }
+
+            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderCancel")
+            {
+                Status = orderStatus,
+                FillQuantity = order.PendingCancelQuantity,
             };
 
             OnOrderEvent(orderEvent);

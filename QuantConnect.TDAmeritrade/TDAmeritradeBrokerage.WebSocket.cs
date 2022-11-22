@@ -189,10 +189,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 };
 
                 WebSocket.Send(JsonConvert.SerializeObject(request));
+                
+                // After login, we need to subscribe to account's Trade activity chanel
+                SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
             }
 
-            // After login, we need to subscribe to account's Trade activity chanel
-            SubscribeToAccountActivity();
         }
 
         public void LogOut()
@@ -264,11 +265,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// Common usage would involve issuing the OrderStatus API request to get all transactions for an account, and subscribing to 
         /// ACCT_ACTIVITY to get any updates. 
         /// </summary>
-        private void SubscribeToAccountActivity()
+        private void SubscribeToAccountActivity(UserPrincipalsModel userPrincipals, string streamSubscriptionKey)
         {
-            var userPrincipals = GetUserPrincipals();
-            var accountActivityKey = GetStreamerSubscriptionKeys();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -282,7 +280,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
                         {
-                            keys = $"{accountActivityKey}",
+                            keys = $"{streamSubscriptionKey}",
                             fields = "0,1,2,3"
                             #region Description Fields
                             /* 0 - Subscription Key

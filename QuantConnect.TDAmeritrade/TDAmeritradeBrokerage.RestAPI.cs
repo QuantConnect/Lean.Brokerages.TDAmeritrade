@@ -249,7 +249,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddQueryParameter("accountIds", _accountNumber);
 
-            var keys = Execute<StreamerSubscriptionKeys[]>(request, "keys");
+            var keys = Execute<Keys[]>(request, "keys");
 
             return keys[0].Key;
         }

@@ -37,6 +37,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         [JsonProperty(PropertyName = "professionalStatus")]
         public string ProfessionalStatus { get; set; } = string.Empty;
 
+        [JsonProperty(PropertyName = "streamerSubscriptionKeys")]
+        public StreamerSubscriptionKeys StreamerSubscriptionKeys { get; set; }
+
         [JsonProperty(PropertyName = "quotes")]
         public QuotesModel Quotes { get; set; }
 

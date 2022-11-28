@@ -13,12 +13,22 @@
  * limitations under the License.
 */
 
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.Interfaces;
+
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
     public class TDAmeritradeSymbolMapper : ISymbolMapper
     {
+        private readonly IMapFileProvider _mapFileProvider;
+
         // Generated map for websocket symbols, to have O(1) access
         private readonly Dictionary<string, Symbol> _wsSymbolMap = new();
+
+        public TDAmeritradeSymbolMapper(IMapFileProvider mapFileProvider)
+        {
+            _mapFileProvider = mapFileProvider;
+        }
 
         public string GetBrokerageSymbol(Symbol symbol)
         {
@@ -31,7 +41,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 && symbol.ID.SecurityType != SecurityType.IndexOption)
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid security type: " + symbol.ID.SecurityType);
 
-            return symbol.Value;
+            return GetMappedTicker(symbol);
         }
 
         public Symbol GetLeanSymbol(string brokerageSymbol, SecurityType securityType, string market, DateTime expirationDate = default, decimal strike = 0, OptionRight optionRight = OptionRight.Call)
@@ -65,6 +75,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             throw new ArgumentException($"TDAmeritrade:SymbolMapper:GetSymbolFromWebsocket(), symbol hasn't kept in collection: {wsSymbol}");
+        }
+
+        private string GetMappedTicker(Symbol symbol)
+        {
+            var ticker = symbol.ID.Symbol;
+            if (symbol.ID.SecurityType == SecurityType.Equity ||
+                symbol.ID.SecurityType == SecurityType.Option ||
+                symbol.ID.SecurityType == SecurityType.Index ||
+                    symbol.ID.SecurityType == SecurityType.IndexOption)
+            {
+                var mapFile = _mapFileProvider.Get(AuxiliaryDataKey.Create(symbol)).ResolveMapFile(symbol);
+                ticker = mapFile.GetMappedSymbol(DateTime.UtcNow, symbol.Value);
+            }
+
+            return ticker;
         }
     }
 }

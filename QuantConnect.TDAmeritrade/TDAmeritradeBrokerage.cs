@@ -50,7 +50,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private readonly object _lockAccessCredentials = new object();
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
-        private readonly TDAmeritradeSymbolMapper _symbolMapper = new();
+        private readonly TDAmeritradeSymbolMapper _symbolMapper;
 
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
         { }
@@ -64,7 +64,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             IAlgorithm algorithm,
             ISecurityProvider securityProvider,
             IDataAggregator aggregator,
-            IOrderProvider orderProvider) : base("TD Ameritrade")
+            IOrderProvider orderProvider,
+            IMapFileProvider mapFileProvider) : base("TD Ameritrade")
         {
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
@@ -75,6 +76,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _securityProvider = securityProvider;
             _aggregator = aggregator;
             _orderProvider = orderProvider;
+            _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);
 
             Initialize();
             //ValidateSubscription(); // Quant Connect api permission

@@ -20,7 +20,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
     {
         [TestCase("AAPL", "AAPL")]
         [TestCase("VXXB", "VXXB")]
-        [TestCase("NB", "NB")]
         public void MapCorrectBrokerageSymbol(string ticker, string wexSymbol)
         {
             var mapper = new TDAmeritradeSymbolMapper(TestGlobals.MapFileProvider);

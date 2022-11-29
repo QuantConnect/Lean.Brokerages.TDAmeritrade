@@ -130,7 +130,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsTrue(isPlaceOrder);
         }
 
-        //[Ignore("Ignore to save cash")]
+        [Ignore("Ignore to save cash")]
         [Test]
         public void PlaceOrderStopLimit()
         {

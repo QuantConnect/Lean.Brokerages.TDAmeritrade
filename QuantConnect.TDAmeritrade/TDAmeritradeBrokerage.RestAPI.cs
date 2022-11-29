@@ -270,19 +270,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
-        /// Retrieve market hours for specified markets
-        /// </summary>
-        public void GetHoursForMultipleMarkets()
-        {
-            var request = new RestRequest("marketdata/hours", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-
-
-
-        }
-
-        /// <summary>
         /// Retrieve market hours for specified single market
         /// </summary>
         /// <param name="marketType">EQUITY, OPTION, FUTURE, BOND, FOREX</param>

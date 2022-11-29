@@ -22,7 +22,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         /// <summary>
         /// Get from TD Ameritrade developer account
         /// </summary>
-        public static string ConsumerKey => Config.Get("tdameritrade-consumer-key");
+        public static string ConsumerKey => Config.Get("tdameritrade-api-key");
 
         /// <summary>
         /// Get from TD Ameritrade developer account (Callback URL)

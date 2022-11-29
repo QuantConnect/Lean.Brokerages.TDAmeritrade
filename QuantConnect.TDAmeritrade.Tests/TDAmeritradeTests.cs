@@ -33,7 +33,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            string _consumerKey = Config.Get("tdameritrade-consumer-key");
+            string _consumerKey = Config.Get("tdameritrade-api-key");
             string _callbackUrl = Config.Get("tdameritrade-callback-url");
             string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
             string _refreshToken = Config.Get("tdameritrade-refresh-token");

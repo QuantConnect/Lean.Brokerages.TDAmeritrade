@@ -31,7 +31,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var data = new Dictionary<string, string>()
                 {
-                    { "tdameritrade-consumer-key", TDAmeritradeConfiguration.ConsumerKey.ToStringInvariant() },
+                    { "tdameritrade-api-key", TDAmeritradeConfiguration.ConsumerKey.ToStringInvariant() },
                     { "tdameritrade-callback-url", TDAmeritradeConfiguration.CallbackUrl.ToStringInvariant() },
                     { "tdameritrade-code-from-url", TDAmeritradeConfiguration.AccessToken.ToStringInvariant() },
                     { "tdameritrade-refresh-token", TDAmeritradeConfiguration.RefreshToken.ToStringInvariant() },
@@ -50,7 +50,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var errors = new List<string>();
 
-            var consumerKey = Read<string>(job.BrokerageData, "tdameritrade-consumer-key", errors);
+            var consumerKey = Read<string>(job.BrokerageData, "tdameritrade-api-key", errors);
             var callback = Read<string>(job.BrokerageData, "tdameritrade-callback-url", errors);
             var codeFromUrl = Read<string>(job.BrokerageData, "tdameritrade-code-from-url", errors);
             var refreshToken = Read<string>(job.BrokerageData, "tdameritrade-refresh-token", errors);

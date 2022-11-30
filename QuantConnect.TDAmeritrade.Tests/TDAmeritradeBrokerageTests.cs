@@ -29,17 +29,15 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
     {
         protected override Symbol Symbol => Symbol.Create("LODE", SecurityType.Equity, Market.USA);
 
-        protected override SecurityType SecurityType => SecurityType.Equity;        
+        protected override SecurityType SecurityType => SecurityType.Equity;
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
             string _consumerKey = Config.Get("tdameritrade-api-key");
-            string _callbackUrl = Config.Get("tdameritrade-callback-url");
-            string _codeFromUrl = Config.Get("tdameritrade-code-from-url");
-            string _refreshToken = Config.Get("tdameritrade-refresh-token");
+            string _codeFromUrl = Config.Get("tdameritrade-access-token");
             string _accountNumber = Config.Get("tdameritrade-account-number");
 
-            return new TDAmeritradeBrokerage(_consumerKey, _refreshToken, _callbackUrl, _codeFromUrl, _accountNumber, null, securityProvider, new AggregationManager(), orderProvider,
+            return new TDAmeritradeBrokerage(_consumerKey, _codeFromUrl, _accountNumber, null, securityProvider, new AggregationManager(), orderProvider,
                 TestGlobals.MapFileProvider);
         }
 
@@ -102,7 +100,22 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         }
 
-        [Ignore("Ignore to save cash")]
+        [Ignore("Get URL string to get access_token")]
+        [Test]
+        public void GetSignInUrl()
+        {
+            string _consumerKey = Config.Get("tdameritrade-api-key");
+            string _codeFromUrl = Config.Get("tdameritrade-access-token");
+            string _accountNumber = Config.Get("tdameritrade-account-number");
+
+            var brokerage = new TDAmeritradeBrokerage(_consumerKey, _codeFromUrl, _accountNumber, null, null, new AggregationManager(), null, TestGlobals.MapFileProvider);
+
+            var res = brokerage.GetSignInUrl();
+
+            Assert.IsNotNull(res);
+        }
+
+        //[Ignore("Ignore to save cash")]
         [Test]
         public void PlaceOrderMarket()
         {

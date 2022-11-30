@@ -86,7 +86,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);
 
             Initialize();
-            //ValidateSubscription(); // Quant Connect api permission
         }
 
         #region TD Ameritrade client

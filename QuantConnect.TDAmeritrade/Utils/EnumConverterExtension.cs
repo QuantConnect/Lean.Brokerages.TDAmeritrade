@@ -160,6 +160,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             Orders.OrderType.Market => Models.OrderType.Market,
             Orders.OrderType.Limit => Models.OrderType.Limit,
             Orders.OrderType.StopLimit => Models.OrderType.StopLimit,
+            Orders.OrderType.StopMarket => Models.OrderType.Stop,
             _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderType {nameof(orderType)}")
         };
 

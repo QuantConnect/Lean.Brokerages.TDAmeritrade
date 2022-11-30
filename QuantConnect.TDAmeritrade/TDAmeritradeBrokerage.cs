@@ -39,7 +39,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         private readonly string _consumerKey;
         private readonly string _refreshToken;
-        private readonly string _callbackUrl;
         private readonly string _codeFromUrl;
         private readonly string _accountNumber;
 
@@ -65,7 +64,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public TDAmeritradeBrokerage(
             string consumerKey,
             string refreshToken,
-            string callbackUrl,
             string codeFromUrl,
             string accountNumber,
             IAlgorithm algorithm,
@@ -76,7 +74,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             _consumerKey = consumerKey;
             _refreshToken = refreshToken;
-            _callbackUrl = callbackUrl;
             _codeFromUrl = codeFromUrl;
             _accountNumber = accountNumber;
             _algorithm = algorithm;

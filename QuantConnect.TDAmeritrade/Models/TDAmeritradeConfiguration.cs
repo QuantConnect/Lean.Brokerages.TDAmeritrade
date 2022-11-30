@@ -25,11 +25,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public static string ConsumerKey => Config.Get("tdameritrade-api-key");
 
         /// <summary>
-        /// Get from TD Ameritrade developer account (Callback URL)
-        /// </summary>
-        public static string CallbackUrl => Config.Get("tdameritrade-callback-url");
-
-        /// <summary>
         /// Get from TD Ameritrade broker account
         /// <see href="https://developer.tdameritrade.com/content/authentication-faq"/>
         /// <seealso href="https://www.reddit.com/r/algotrading/comments/c81vzq/td_ameritrade_api_access_2019_guide/"/>

@@ -401,7 +401,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 body["client_id"] = _consumerKey + "@AMER.OAUTHAP";
 
                 if (grantType == GrantType.AuthorizationCode)
-                    body["redirect_uri"] = _callbackUrl;
+                    body["redirect_uri"] = "http://localhost";
 
                 var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(body) };
                 var res = client.Send(req);

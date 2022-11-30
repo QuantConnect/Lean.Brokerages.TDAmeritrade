@@ -32,7 +32,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 var data = new Dictionary<string, string>()
                 {
                     { "tdameritrade-api-key", TDAmeritradeConfiguration.ConsumerKey.ToStringInvariant() },
-                    { "tdameritrade-callback-url", TDAmeritradeConfiguration.CallbackUrl.ToStringInvariant() },
                     { "tdameritrade-code-from-url", TDAmeritradeConfiguration.AccessToken.ToStringInvariant() },
                     { "tdameritrade-refresh-token", TDAmeritradeConfiguration.RefreshToken.ToStringInvariant() },
                     { "tdameritrade-account-number", TDAmeritradeConfiguration.AccountNumber.ToStringInvariant() }
@@ -51,12 +50,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var errors = new List<string>();
 
             var consumerKey = Read<string>(job.BrokerageData, "tdameritrade-api-key", errors);
-            var callback = Read<string>(job.BrokerageData, "tdameritrade-callback-url", errors);
             var codeFromUrl = Read<string>(job.BrokerageData, "tdameritrade-code-from-url", errors);
             var refreshToken = Read<string>(job.BrokerageData, "tdameritrade-refresh-token", errors);
             var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
-            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, callback, codeFromUrl, accountNumber, algorithm, algorithm.Portfolio,
+            var brokerage = new TDAmeritradeBrokerage(consumerKey, refreshToken, codeFromUrl, accountNumber, algorithm, algorithm.Portfolio,
                 Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false), algorithm.Transactions,
                 Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")));
 

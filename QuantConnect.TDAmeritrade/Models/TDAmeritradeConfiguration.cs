@@ -32,11 +32,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public static string AccessToken => Config.Get("tdameritrade-code-from-url");
 
         /// <summary>
-        /// Get from authorization code (A refresh token is valid for 90 days)
-        /// </summary>
-        public static string RefreshToken => Config.Get("tdameritrade-refresh-token");
-
-        /// <summary>
         /// Get from TD Ameritrade brokerage account
         /// </summary>
         public static string AccountNumber => Config.Get("tdameritrade-account-number");

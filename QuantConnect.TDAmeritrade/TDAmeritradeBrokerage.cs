@@ -38,9 +38,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     public partial class TDAmeritradeBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {
         private readonly string _consumerKey;
-        private readonly string _refreshToken;
         private readonly string _codeFromUrl;
         private readonly string _accountNumber;
+        private string _refreshToken;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
         /// <summary>
@@ -63,7 +63,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public TDAmeritradeBrokerage(
             string consumerKey,
-            string refreshToken,
             string codeFromUrl,
             string accountNumber,
             IAlgorithm algorithm,
@@ -73,7 +72,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             IMapFileProvider mapFileProvider) : base("TD Ameritrade")
         {
             _consumerKey = consumerKey;
-            _refreshToken = refreshToken;
             _codeFromUrl = codeFromUrl;
             _accountNumber = accountNumber;
             _algorithm = algorithm;
@@ -265,6 +263,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             RestClient = new RestClient(_restApiUrl);
+
+            if(string.IsNullOrEmpty(_refreshToken))
+                _refreshToken = PostAccessToken(GrantType.AuthorizationCode, _codeFromUrl).RefreshToken;
 
             PostAccessToken(GrantType.RefreshToken, string.Empty);
 

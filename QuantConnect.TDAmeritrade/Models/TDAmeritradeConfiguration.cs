@@ -29,7 +29,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         /// <see href="https://developer.tdameritrade.com/content/authentication-faq"/>
         /// <seealso href="https://www.reddit.com/r/algotrading/comments/c81vzq/td_ameritrade_api_access_2019_guide/"/>
         /// </summary>
-        public static string AccessToken => Config.Get("tdameritrade-code-from-url");
+        public static string AccessToken => Config.Get("tdameritrade-access-token");
 
         /// <summary>
         /// Get from TD Ameritrade brokerage account

@@ -4,5 +4,5 @@
 
   "tdameritrade-account-number": "",
   "tdameritrade-api-key": "",
-  "tdameritrade-code-from-url": ""
+  "tdameritrade-access-token": ""
 }

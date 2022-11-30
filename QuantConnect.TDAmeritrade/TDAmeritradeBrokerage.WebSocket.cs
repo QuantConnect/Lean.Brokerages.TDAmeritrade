@@ -477,13 +477,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var qcOrder = _orderProvider.GetOrders().Last();
+            var qcOrder = _orderProvider.GetOrders(x => x.Status == OrderStatus.None).Last();
 
             var time = order.Order.OrderEnteredDateTime;
 
             qcOrder.Status = OrderStatus.Submitted;
             qcOrder.BrokerId.Add(order.Order.OrderKey.ToStringInvariant());
-
+            
             OnOrderEvent(new OrderEvent(qcOrder, time, Orders.Fees.OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
             Log.Trace($"Order submitted successfully - OrderId: {order.Order.OrderKey.ToStringInvariant()}");
         }

@@ -284,11 +284,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             RestClient = new RestClient(_restApiUrl);
-
-            if(string.IsNullOrEmpty(_refreshToken))
+            
+            if(!string.IsNullOrEmpty(_accessToken) && string.IsNullOrEmpty(_refreshToken))
                 _refreshToken = PostAccessToken(GrantType.AuthorizationCode, _accessToken).RefreshToken;
 
-            PostAccessToken(GrantType.RefreshToken, string.Empty);
+            if(!string.IsNullOrEmpty(_refreshToken))
+                PostAccessToken(GrantType.RefreshToken, string.Empty);
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 

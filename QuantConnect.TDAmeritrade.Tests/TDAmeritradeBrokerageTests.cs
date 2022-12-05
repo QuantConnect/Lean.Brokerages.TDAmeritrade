@@ -100,21 +100,6 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         }
 
-        [Ignore("Get URL string to get access_token")]
-        [Test]
-        public void GetSignInUrl()
-        {
-            string _consumerKey = Config.Get("tdameritrade-api-key");
-            string _codeFromUrl = Config.Get("tdameritrade-access-token");
-            string _accountNumber = Config.Get("tdameritrade-account-number");
-
-            var brokerage = new TDAmeritradeBrokerage(_consumerKey, _codeFromUrl, _accountNumber, null, null, new AggregationManager(), null, TestGlobals.MapFileProvider);
-
-            var res = brokerage.GetSignInUrl();
-
-            Assert.IsNotNull(res);
-        }
-
         //[Ignore("Ignore to save cash")]
         [Test]
         public void PlaceOrderMarket()

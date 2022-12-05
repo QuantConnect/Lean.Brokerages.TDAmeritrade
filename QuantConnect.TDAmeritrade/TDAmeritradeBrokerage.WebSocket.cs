@@ -160,7 +160,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public void Login()
         {
-            if (WebSocket.IsOpen)
+            if (WebSocket.IsOpen && !string.IsNullOrEmpty(_refreshToken))
             {
                 var userPrincipals = GetUserPrincipals();
 

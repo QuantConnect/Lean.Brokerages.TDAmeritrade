@@ -34,6 +34,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
 
         /// <summary>
+        /// We're caching orders to increase speed of getting info about ones
+        /// </summary>
+        private Queue<OrderModel> _cachedOrdersFromWebSocket = new Queue<OrderModel>(); 
+
+        /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
         public override bool IsConnected => WebSocket.IsOpen;
@@ -477,15 +482,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var qcOrder = _orderProvider.GetOrders(x => x.Status == OrderStatus.None).Last();
+            _cachedOrdersFromWebSocket.Enqueue(new OrderModel()
+            {
+                OrderId = order.Order.OrderKey,
+                EnteredTime = order.Order.OrderEnteredDateTime
+            });
 
-            var time = order.Order.OrderEnteredDateTime;
-
-            qcOrder.Status = OrderStatus.Submitted;
-            qcOrder.BrokerId.Add(order.Order.OrderKey.ToStringInvariant());
-            
-            OnOrderEvent(new OrderEvent(qcOrder, time, Orders.Fees.OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
-            Log.Trace($"Order submitted successfully - OrderId: {order.Order.OrderKey.ToStringInvariant()}");
+            // Reset Event for PlaceOrder mthd()
+            _successPlaceOrderEvent.Set();
         }
 
         private void HandleOrderFill(OrderFillMessage? order)

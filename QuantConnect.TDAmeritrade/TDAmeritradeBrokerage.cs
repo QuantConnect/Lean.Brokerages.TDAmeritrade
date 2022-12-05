@@ -58,6 +58,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
         private readonly TDAmeritradeSymbolMapper _symbolMapper;
 
+        /// <summary>
+        /// Thread synchronization event, for successful Place Order
+        /// </summary>
+        private ManualResetEvent _successPlaceOrderEvent = new ManualResetEvent(false);
+
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
         { }
 
@@ -174,11 +179,27 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (!string.IsNullOrEmpty(response))
             {
-                var orderFee = OrderFee.Zero;   
-                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = response });
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = response });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, response));
                 return false;
             }
+
+            var orderResponse = new OrderModel();
+
+            if (!_successPlaceOrderEvent.WaitOne(TimeSpan.FromSeconds(5)))
+            {
+                orderResponse = GetOrdersByPath().First(); // The list is reversed                
+            }
+            else
+            {
+                orderResponse = _cachedOrdersFromWebSocket.Dequeue();
+            }
+            _successPlaceOrderEvent.Reset();                
+
+            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
+
+            OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
+            Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
 
             return true;
         }

@@ -71,7 +71,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public OrderStatusType Status { get; set; }
 
         [JsonProperty(PropertyName = "enteredTime")]
-        public string EnteredTime { get; set; } = string.Empty;
+        public DateTime EnteredTime { get; set; }
 
         [JsonProperty(PropertyName = "closeTime")]
         public string CloseTime { get; set; } = string.Empty;

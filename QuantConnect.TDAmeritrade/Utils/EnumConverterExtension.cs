@@ -82,7 +82,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
 
             var symbol = order.OrderLegCollections[0].Instrument.Symbol;// _symbolMapper.GetLeanSymbol(order.Class == TradierOrderClass.Option ? order.OptionSymbol : order.Symbol);
             var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ToEnum<InstructionType>());
-            var time = Time.ParseDate(order.EnteredTime);
+            var time = order.EnteredTime;
 
             switch (order.OrderType.ToEnum<Models.OrderType>())
             {

@@ -13,44 +13,61 @@
  * limitations under the License.
 */
 
-
 using QuantConnect.Data.Market;
 using QuantConnect.Logging;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
+    [TestFixture]
     public partial class TDAmeritradeTests
     {
-        [Test]
-        public void StreamsData()
+        private static TestCaseData[] TestParameters
+        {
+            get
+            {
+                return new[]
+                {
+                    new TestCaseData(Symbols.AAPL, Resolution.Minute, false),
+                };
+            }
+        }
+
+        [Test, TestCaseSource(nameof(TestParameters))]
+        public void StreamsData(Symbol symbol, Resolution resolution, bool throwsException)
         {
             var cancelationToken = new CancellationTokenSource();
             var brokerage = (TDAmeritradeBrokerage)Brokerage;
 
-            var symbol = Symbols.AAPL;
-            var symbol2 = Symbols.IBM;
-
-            var configs = new[] {
-                GetSubscriptionDataConfig<QuoteBar>(symbol, Resolution.Tick),
-                GetSubscriptionDataConfig<TradeBar>(symbol2, Resolution.Tick)
-                };
+            SubscriptionDataConfig[] configs;
+            if (resolution == Resolution.Tick)
+            {
+                var tradeConfig = new SubscriptionDataConfig(GetSubscriptionDataConfig<Tick>(symbol, resolution), tickType: TickType.Trade);
+                var quoteConfig = new SubscriptionDataConfig(GetSubscriptionDataConfig<Tick>(symbol, resolution), tickType: TickType.Quote);
+                configs = new[] { tradeConfig, quoteConfig };
+            }
+            else
+            {
+                configs = new[] { GetSubscriptionDataConfig<QuoteBar>(symbol, resolution),
+                    GetSubscriptionDataConfig<TradeBar>(symbol, resolution) };
+            }
 
             foreach (var config in configs)
             {
                 ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
                     cancelationToken,
-                    (baseData) =>
-                    {
-                        if (baseData != null) { Log.Trace($"{baseData}"); }
+                    (baseData) => {
+                        if (baseData != null) { Log.Trace("{baseData}"); }
                     });
             }
 
-            Thread.Sleep(10000);
+            Thread.Sleep(20000);
 
             foreach (var config in configs)
+            {
                 brokerage.Unsubscribe(config);
+            }
 
-            Thread.Sleep(5000);
+            Thread.Sleep(20000);
 
             cancelationToken.Cancel();
         }

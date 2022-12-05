@@ -1,4 +1,5 @@
 global using NUnit.Framework;
+global using QuantConnect.Data;
 global using QuantConnect.Configuration;
 global using QuantConnect.Lean.Engine.DataFeeds;
 global using QuantConnect.Brokerages.TDAmeritrade;

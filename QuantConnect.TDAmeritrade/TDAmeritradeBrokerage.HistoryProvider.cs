@@ -104,10 +104,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var history = GetPriceHistory(
                 symbol,
                 periodType,
+                1,
                 frequencyType: frequencyType,
                 frequency: request.Resolution.ResolutionToFrequency(),
                 startDate: start,
-                endDate: end);
+                endDate: end,
+                true);
 
             if (history == null)
             {

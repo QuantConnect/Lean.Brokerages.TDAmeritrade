@@ -27,13 +27,38 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         #region GET
 
-        public CandleListModel GetPriceHistory(Symbol symbol, PeriodType periodType = PeriodType.Day,
-            int period = 1,
-            FrequencyType frequencyType = FrequencyType.NoValue,
-            int frequency = 1,
-            DateTime? startDate = null,
-            DateTime? endDate = null,
-            bool needExtendedHoursData = true)
+        /// <summary>
+        /// Get price history for a symbol
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <param name="periodType">The type of period to show. Valid values are day, month, year, or ytd (year to date)</param>
+        /// <param name="period">The number of periods to show. Example: For a 2 day / 1 min chart, the values would be</param>
+        /// <param name="frequencyType">
+        /// The type of frequency with which a new candle is formed. 
+        /// day: minute*
+        /// month: daily, weekly*
+        /// year: daily, weekly, monthly*
+        /// ytd: daily, weekly*
+        /// </param>
+        /// <param name="frequency">The number of the frequencyType to be included in each candle.
+        /// minute: 1*, 5, 10, 15, 30
+        /// daily: 1*
+        /// weekly: 1*
+        /// monthly: 1*
+        /// </param>
+        /// <param name="startDate">Start date as milliseconds since epoch. If startDate and endDate are provided, period should not be provided.</param>
+        /// <param name="endDate">End date as milliseconds since epoch. If startDate and endDate are provided, period should not be provided. Default is previous trading day.</param>
+        /// <param name="needExtendedHoursData">true to return extended hours data, false for regular market hours only.</param>
+        /// <returns></returns>
+        private CandleListModel GetPriceHistory(
+            Symbol symbol, 
+            PeriodType periodType,
+            int period,
+            FrequencyType frequencyType,
+            int frequency,
+            DateTime? startDate,
+            DateTime? endDate,
+            bool needExtendedHoursData)
         {
             var request = new RestRequest($"marketdata/{symbol.Value}/pricehistory", Method.GET);
 

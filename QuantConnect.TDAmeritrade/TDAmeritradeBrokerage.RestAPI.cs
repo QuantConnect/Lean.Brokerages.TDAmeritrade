@@ -27,35 +27,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     {
         #region GET
 
-        public InstrumentModel GetInstrumentByCUSIP(string cusip)
-        {
-            var request = new RestRequest($"instruments/{cusip}", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-            request.AddQueryParameter("projection", "fundamental");
-
-            var instrumentResponse = Execute<List<InstrumentModel>>(request);
-            return instrumentResponse.First();
-        }
-
-        public InstrumentFundamentalModel GetSearchInstruments(string symbol, ProjectionType projectionType = ProjectionType.SymbolSearch)
-        {
-            var request = new RestRequest("instruments", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-            request.AddQueryParameter("symbol", symbol);
-            request.AddQueryParameter("projection", projectionType.GetProjectionTypeInRequestFormat());
-
-            var instrumentResponse = projectionType switch
-            {
-                ProjectionType.SymbolSearch => Execute<InstrumentFundamentalModel>(request, symbol),
-                ProjectionType.Fundamental => Execute<InstrumentFundamentalModel>(request, symbol),
-                _ => throw new ArgumentOutOfRangeException(nameof(projectionType), $"Not expected projectionType value: {projectionType}")
-            };
-
-            return instrumentResponse;
-        }
-
         public CandleListModel GetPriceHistory(Symbol symbol, PeriodType periodType = PeriodType.Day,
             int period = 1,
             FrequencyType frequencyType = FrequencyType.NoValue,
@@ -155,18 +126,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
-        /// Account balances, positions, and orders for all linked accounts.
-        /// </summary>
-        public List<AccountModel> GetAccounts()
-        {
-            var request = new RestRequest("accounts", Method.GET);
-
-            request.AddQueryParameter("fields", "positions,orders");
-
-            return Execute<List<AccountModel>>(request);
-        }
-
-        /// <summary>
         /// Account balances, positions, and orders for a specific account.
         /// </summary>
         public AccountModel GetAccount(string accountNumber)
@@ -199,50 +158,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
-        /// All orders for a specific account or, if account ID isn't specified, orders will be returned for all linked accounts.
-        /// </summary>
-        /// <param name="accountNumber">Account Number.</param>
-        /// <param name="maxResults">The max number of orders to retrieve.</param>
-        /// <param name="fromEnteredTime">Specifies that no orders entered before this time should be returned. 
-        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
-        /// If 'toEnteredTime' is not sent, the default `toEnteredTime` would be the current day.
-        /// </param>
-        /// <param name="toEnteredTime">Specifies that no orders entered after this time should be returned.
-        /// Valid ISO-8601 formats are :yyyy-MM-dd. 
-        /// If 'fromEnteredTime' is not sent, the default `fromEnteredTime` would be 60 days from `toEnteredTime`.
-        /// </param>
-        /// <param name="orderStatusType">Specifies that only orders of this status should be returned.</param>
-        /// <returns></returns>
-        public IEnumerable<OrderModel> GetOrdersByQuery(
-            string accountNumber,
-            int? maxResults = null,
-            DateTime? fromEnteredTime = null,
-            DateTime? toEnteredTime = null,
-            OrderStatusType orderStatusType = OrderStatusType.NoValue)
-        {
-            var request = new RestRequest($"orders", Method.GET);
-
-            request.AddQueryParameter("accountId", accountNumber);
-
-            return GetOrderByDifferentPath(request, maxResults, fromEnteredTime, toEnteredTime, orderStatusType);
-        }
-
-        /// <summary>
-        /// Get a specific order for a specific account.
-        /// </summary>
-        /// <param name="orderNumber">Order Number</param>
-        /// <param name="accountNumber">Account Number</param>
-        /// <returns></returns>
-        public OrderModel GetOrder(string orderNumber, string accountNumber = null)
-        {
-            var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
-
-            var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.GET);
-
-            return Execute<OrderModel>(request);
-        }
-
-        /// <summary>
         /// User Principal details
         /// </summary>
         public UserPrincipalsModel GetUserPrincipals()
@@ -252,118 +167,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             request.AddQueryParameter("fields", "streamerSubscriptionKeys,streamerConnectionInfo,preferences,surrogateIds");
 
             return Execute<UserPrincipalsModel>(request);
-        }
-
-        /// <summary>
-        /// SubscriptionKey for provided accounts or default accounts.
-        /// </summary>
-        /// <returns>SubscriptionKey</returns>
-        public string GetStreamerSubscriptionKeys()
-        {
-            var request = new RestRequest("userprincipals/streamersubscriptionkeys", Method.GET);
-
-            request.AddQueryParameter("accountIds", _accountNumber);
-
-            var keys = Execute<Keys[]>(request, "keys");
-
-            return keys[0].Key;
-        }
-
-        /// <summary>
-        /// Retrieve market hours for specified single market
-        /// </summary>
-        /// <param name="marketType">EQUITY, OPTION, FUTURE, BOND, FOREX</param>
-        /// <returns>return market data by specific market type</returns>
-        public Dictionary<string, MarketHoursModel> GetHoursForSingleMarket(MarketType marketType)
-        {
-            var request = new RestRequest($"marketdata/{marketType.GetEnumValue()}/hours", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-
-            var market = Execute<Dictionary<string, Dictionary<string, MarketHoursModel>>>(request);
-
-            return market[market.Keys.First()];
-        }
-
-        /// <summary>
-        /// Retrieve market hours for specified markets
-        /// </summary>
-        /// <param name="marketType">EQUITY, OPTION, FUTURE, BOND, FOREX</param>
-        /// <returns>return market data by specific market type</returns>
-        public Dictionary<string, Dictionary<string, MarketHoursModel>> GetHoursForMultipleMarkets(params MarketType[] marketTypes)
-        {
-            var request = new RestRequest("marketdata/hours", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-
-            request.AddQueryParameter("markets", string.Join(',', marketTypes.Select(x => x.GetEnumValue())));
-
-            var markets = Execute<Dictionary<string, Dictionary<string, MarketHoursModel>>>(request);
-
-            return markets;
-        }
-
-        /// <summary>
-        /// Top 10 (up or down) movers by value or percent for a particular market
-        /// </summary>
-        /// <param name="indexMoverType">The index symbol to get movers from. ($COMPX, $DJI, $SPX.X)</param>
-        /// <param name="directionType">To return movers with the specified directions of up or down.</param>
-        /// <param name="changeType">To return movers with the specified change types of percent or value</param>
-        /// <returns></returns>
-        public List<MoverModel> GetMovers(IndexMoverType indexMoverType, DirectionType directionType = DirectionType.NoValue, ChangeType changeType = ChangeType.NoValue)
-        {
-            var request = new RestRequest($"marketdata/{indexMoverType.GetEnumValue()}/movers", Method.GET);
-
-            request.AddQueryParameter("apikey", _consumerKey);
-
-            if (directionType != DirectionType.NoValue)
-                request.AddQueryParameter("direction", directionType.GetEnumValue());
-
-            if (changeType != ChangeType.NoValue)
-                request.AddQueryParameter("change", changeType.GetEnumValue());
-
-            return Execute<List<MoverModel>>(request);
-        }
-
-        /// <summary>
-        /// Transactions for a specific account.
-        /// </summary>
-        /// <param name="accountNumber"></param>
-        /// <param name="transactionType">Only transactions with the specified type will be returned.</param>
-        /// <param name="symbol">Only transactions with the specified symbol will be returned.</param>
-        /// <param name="startDate">Only transactions after the Start Date will be returned.
-        /// Note: The maximum date range is one year.Valid ISO-8601 formats are :
-        /// yyyy-MM-dd.
-        /// </param>
-        /// <param name="endDate">Only transactions before the End Date will be returned.
-        /// Note: The maximum date range is one year.Valid ISO-8601 formats are :
-        /// yyyy-MM-dd.
-        /// </param>
-        /// <returns>Collection of Transactions</returns>
-        public IEnumerable<TransactionModel> GetTransactions(
-            string? accountNumber = null,
-            TransactionType transactionType = TransactionType.NO_VALUE,
-            string? symbol = null,
-            DateTime? startDate = null,
-            DateTime? endDate = null)
-        {
-            var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
-
-            var request = new RestRequest($"accounts/{account}/transactions", Method.GET);
-
-            if (transactionType != TransactionType.NO_VALUE)
-                request.AddQueryParameter("type", transactionType.GetEnumValue());
-
-            if (!string.IsNullOrEmpty(symbol))
-                request.AddQueryParameter("symbol", symbol);
-
-            if (startDate.HasValue && (endDate.HasValue ? endDate.Value > startDate.Value : true))
-                request.AddQueryParameter("startDate", startDate.Value.ToString("yyyy-MM-dd"));
-
-            if (endDate.HasValue && (startDate.HasValue ? startDate.Value < endDate.Value : true))
-                request.AddQueryParameter("endDate", endDate.Value.ToString("yyyy-MM-dd"));
-
-            return Execute<List<TransactionModel>>(request);
         }
 
         #endregion

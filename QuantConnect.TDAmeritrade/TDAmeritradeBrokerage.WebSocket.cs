@@ -78,7 +78,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (symbolsAdded)
             {
-                SubscribeToLevelOne(_subscribedTickers.Keys.Select(x => x.Value).ToArray());
+                var subscribeSymbolArray = _subscribedTickers.Keys.Select(x => x.Value).ToArray();
+                SubscribeToLevelOne(subscribeSymbolArray);
+                SubscribetToChart(subscribeSymbolArray);
             }
 
             return true;
@@ -111,7 +113,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (symbolsRemoved)
             {
-                UnSubscribeToLevelOne(removedSymbols.ToArray());
+                var removeSymbolArray = removedSymbols.ToArray();
+                UnSubscribeToLevelOne(removeSymbolArray);
+                UnSubscribeToChart(removeSymbolArray);
             }
 
             return true;
@@ -280,6 +284,55 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
+        /// Chart provides  streaming one minute OHLCV (Open/High/Low/Close/Volume) for a one minute period.
+        /// </summary>
+        /// <remarks>
+        /// The one minute bar falls on the 0 second slot (ie. 9:30:00) and includes data from 0 second to 59 seconds.
+        /// </remarks>
+        /// <example>
+        /// For example, a 9:30 bar includes data from 9:30:00 through 9:30:59.
+        /// </example>
+        /// <param name="symbols"></param>
+        private void SubscribetToChart(params string[] symbols)
+        {
+            var userPrincipals = GetUserPrincipals();
+
+            var request = new StreamRequestModelContainer
+            {
+                Requests = new StreamRequestModel[]
+                {
+                    new StreamRequestModel
+                    {
+                        Service = "CHART_EQUITY",
+                        Command = "SUBS",
+                        Requestid = Interlocked.Increment(ref _counter),
+                        Account = userPrincipals.Accounts[0].AccountId,
+                        Source = userPrincipals.StreamerInfo.AppId,
+                        Parameters = new
+                        {
+                            keys = $"{string.Join(",", symbols)}",
+                            fields = "0,1,2,3,4,5,6,7,8"
+                            #region Description Fields
+                            /* 0 - Ticker symbol in upper case.
+                             * 1 - Open Price, Opening price for the minute
+                             * 2 - High Price, Highest price for the minute
+                             * 3 - Low Price, Chart’s lowest price for the minute
+                             * 4 - Close Price, Closing price for the minute
+                             * 5 - Volume, Total volume for the minute
+                             * 6 - Sequence, Identifies the candle minute
+                             * 7 - Chart Time, Milliseconds since Epoch
+                             * 8 - Chart Day, Not useful
+                             */
+                            #endregion
+                        }
+                    }
+                }
+            };
+
+            WebSocket.Send(JsonConvert.SerializeObject(request));
+        }
+
+        /// <summary>
         /// This service is used to request streaming updates for one or more accounts associated with the logged in User ID.  
         /// Common usage would involve issuing the OrderStatus API request to get all transactions for an account, and subscribing to 
         /// ACCT_ACTIVITY to get any updates. 
@@ -342,6 +395,32 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             WebSocket.Send(JsonConvert.SerializeObject(request));
         }
 
+        private void UnSubscribeToChart(params string[] symbols)
+        {
+            var userPrincipals = GetUserPrincipals();
+
+            var request = new StreamRequestModelContainer
+            {
+                Requests = new StreamRequestModel[]
+                {
+                    new StreamRequestModel
+                    {
+                        Service = "CHART_EQUITY",
+                        Command = "UNSUBS",
+                        Requestid = Interlocked.Increment(ref _counter),
+                        Account = userPrincipals.Accounts[0].AccountId,
+                        Source = userPrincipals.StreamerInfo.AppId,
+                        Parameters = new
+                        {
+                            keys = $"{string.Join(",", symbols)}"
+                        }
+                    }
+                }
+            };
+
+            WebSocket.Send(JsonConvert.SerializeObject(request));
+        }
+
         /// <summary>
         /// Handle Streaming market data
         /// </summary>
@@ -352,6 +431,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 case "QUOTE":
                     ParseQuoteLevelOneData(token["content"]);
+                    break;
+                case "CHART_EQUITY":
+                    ParseChartEquityData(token["content"]);
                     break;
                 case "ACCT_ACTIVITY":
                     ParseAccountActivity(token["content"]);
@@ -398,6 +480,28 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     if (token["content"]["code"].Value<int>() == 30)
                         Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleNotify: {token["content"]["msg"]}");
                     break;
+            }
+        }
+
+        private void ParseChartEquityData(JToken content)
+        {
+            var charts = content.ToObject<List<ChartEquityModel>>() ?? new List<ChartEquityModel>(0);
+
+            foreach(var chart in charts)
+            {
+                var symbolLean = _symbolMapper.GetSymbolFromWebsocket(chart.Symbol);
+
+                _aggregator.Update(new TradeBar
+                {
+                    Symbol = symbolLean,
+                    Open = chart.OpenPrice,
+                    Close = chart.ClosePrice,
+                    High = chart.HighPrice,
+                    Low = chart.LowPrice,
+                    Volume = chart.Volume,
+                    Period = TimeSpan.FromMinutes(1),
+                    Time = Time.UnixMillisecondTimeStampToDateTime(chart.ChartTime)
+                });
             }
         }
 

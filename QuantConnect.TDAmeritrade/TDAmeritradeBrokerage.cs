@@ -260,7 +260,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     Symbol = symbol,
                     AveragePrice = hold.AveragePrice,
                     MarketPrice = hold.MarketValue,
-                    Quantity = hold.SettledLongQuantity + hold.SettledShortQuantity,
+                    Quantity = hold.LongQuantity + hold.ShortQuantity,
                     MarketValue = hold.MarketValue,
                     UnrealizedPnL = hold.CurrentDayProfitLossPercentage // % or $ - ?
                 });

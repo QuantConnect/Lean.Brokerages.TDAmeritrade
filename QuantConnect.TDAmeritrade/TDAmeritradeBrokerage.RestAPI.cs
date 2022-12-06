@@ -236,7 +236,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var accessTokens = Execute<AccessTokenModel>(request);
 
-            RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
+            if (grantType == GrantType.RefreshToken)
+            {
+                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
+            }
 
             return accessTokens;
         }

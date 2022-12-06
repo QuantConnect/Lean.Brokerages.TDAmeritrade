@@ -102,6 +102,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     PostAccessToken(GrantType.RefreshToken, string.Empty);
                     Execute<T>(request, rootName);
                 }
+                else if (request.Resource == "oauth2/token")
+                {
+                    throw new BrokerageException($"TDAmeritradeBrokerage.Execute.{request.Resource}: authorization request is invalid, Response:{raw.Content}");
+                }
                 else if (!string.IsNullOrEmpty(raw.Content))
                 {
                     var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);

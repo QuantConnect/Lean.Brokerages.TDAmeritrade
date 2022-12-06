@@ -54,7 +54,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly IDataAggregator _aggregator;
         private readonly IOrderProvider _orderProvider;
 
-        private readonly object _lockAccessCredentials = new object();
         private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
         private readonly TDAmeritradeSymbolMapper _symbolMapper;
 
@@ -94,47 +93,44 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var response = default(T);
 
-            lock (_lockAccessCredentials)
+            var raw = RestClient.Execute(request);
+
+            if (!raw.IsSuccessful)
             {
-                var raw = RestClient.Execute(request);
-
-                if (!raw.IsSuccessful)
+                if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
-                    if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
+                    PostAccessToken(GrantType.RefreshToken, string.Empty);
+                    Execute<T>(request, rootName);
+                }
+                else if (!string.IsNullOrEmpty(raw.Content))
+                {
+                    var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
+                    Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {raw.Content}");
+                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
+                    return (T)(object)fault.Error;
+                }
+            }
+
+            try
+            {
+                if (typeof(T) == typeof(String))
+                    return (T)(object)raw.Content;
+
+                if (!string.IsNullOrEmpty(rootName))
+                {
+                    if (TryDeserializeRemoveRoot(raw.Content, rootName, out response))
                     {
-                        PostAccessToken(GrantType.RefreshToken, string.Empty);
-                        Execute<T>(request, rootName);
-                    }
-                    else if (!string.IsNullOrEmpty(raw.Content))
-                    {
-                        var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
-                        Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {raw.Content}");
-                        OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
-                        return (T)(object)fault.Error;
+                        return response;
                     }
                 }
-
-                try
+                else
                 {
-                    if (typeof(T) == typeof(String))
-                        return (T)(object)raw.Content;
-
-                    if (!string.IsNullOrEmpty(rootName))
-                    {
-                        if (TryDeserializeRemoveRoot(raw.Content, rootName, out response))
-                        {
-                            return response;
-                        }
-                    }
-                    else
-                    {
-                        return JsonConvert.DeserializeObject<T>(raw.Content);
-                    }
+                    return JsonConvert.DeserializeObject<T>(raw.Content);
                 }
-                catch (Exception e)
-                {
-                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw.Content} Error: {e.Message}"));
-                }
+            }
+            catch (Exception e)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw.Content} Error: {e.Message}"));
             }
 
             return response;
@@ -191,7 +187,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 orderResponse = _cachedOrdersFromWebSocket.Dequeue();
             }
-            _successPlaceOrderEvent.Reset();                
+            _successPlaceOrderEvent.Reset();
 
             order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 
@@ -281,7 +277,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             RestClient = new RestClient(_restApiUrl);
-            
+
             if(!string.IsNullOrEmpty(_accessToken) && string.IsNullOrEmpty(_refreshToken))
                 _refreshToken = PostAccessToken(GrantType.AuthorizationCode, _accessToken).RefreshToken;
 
@@ -291,7 +287,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 
             WebSocket.Open += (sender, args) => { Login(); };
-            
+
             var subscriptionManager = new EventBasedDataQueueHandlerSubscriptionManager();
 
             subscriptionManager.SubscribeImpl += (symbols, _) => Subscribe(symbols);

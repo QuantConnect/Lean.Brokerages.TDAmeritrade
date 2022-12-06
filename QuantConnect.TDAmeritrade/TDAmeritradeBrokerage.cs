@@ -132,7 +132,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
             catch (Exception e)
             {
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {raw.Content} Error: {e.Message}"));
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {untypedResponse.Content} Error: {e.Message}"));
             }
 
             return response;

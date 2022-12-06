@@ -94,9 +94,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var response = default(T);
 
-            var method = "TDAmeritrade.Execute." + request.Resource;
-            var parameters = request.Parameters.Select(x => x.Name + ": " + x.Value);
-
             lock (_lockAccessCredentials)
             {
                 var raw = RestClient.Execute(request);
@@ -111,7 +108,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     else if (!string.IsNullOrEmpty(raw.Content))
                     {
                         var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
-                        Log.Error($"{method}(2): Parameters: {string.Join(",", parameters)} Response: {raw.Content}");
+                        Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {raw.Content}");
                         OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
                         return (T)(object)fault.Error;
                     }

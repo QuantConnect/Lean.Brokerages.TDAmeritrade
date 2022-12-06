@@ -22,7 +22,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [TestCase(PeriodType.Year)]
         public void ConvertPeriodTypeToStringFormat(PeriodType periodType)
         {
-            string periodTypeStr = EnumConverterExtension.GetEnumMemberValue(periodType)!;
+            string periodTypeStr = QuantConnect.Brokerages.TDAmeritrade.Utils.Extensions.GetEnumMemberValue(periodType)!;
 
             Assert.IsNotEmpty(periodTypeStr);
         }

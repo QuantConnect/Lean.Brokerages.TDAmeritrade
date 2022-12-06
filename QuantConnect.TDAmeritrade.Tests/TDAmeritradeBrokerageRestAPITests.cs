@@ -37,7 +37,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             string _codeFromUrl = Config.Get("tdameritrade-access-token");
             string _accountNumber = Config.Get("tdameritrade-account-number");
 
-            _brokerage = new TDAmeritradeBrokerage(_apiKey, _codeFromUrl, _accountNumber, null, null, new AggregationManager(), null, TestGlobals.MapFileProvider);
+            _brokerage = new TDAmeritradeBrokerage(_apiKey, _codeFromUrl, _accountNumber, null, new AggregationManager(), null, TestGlobals.MapFileProvider);
         }
 
         [Test]

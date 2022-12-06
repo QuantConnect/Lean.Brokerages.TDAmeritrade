@@ -158,15 +158,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             decimal limitPrice = 0m;
             if (!isOrderMarket)
             {
-                limitPrice =
+                var limitPriceWithoudRound =
                     (order as LimitOrder)?.LimitPrice ??
                     (order as StopLimitOrder)?.LimitPrice ?? 0;
+
+                limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
             decimal stopPrice = 0m;
             if (order.Type == Orders.OrderType.StopLimit)
             {
-                stopPrice = (order as StopLimitOrder)?.StopPrice ?? 0;
+                var stopPriceWithoudRound = (order as StopLimitOrder)?.StopPrice ?? 0;
+
+                stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
             var response = PostPlaceOrder(order.Type.ConvertQCOrderTypeToExchange(),
@@ -175,7 +179,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 OrderStrategyType.Single,
                 orderLegCollection,
                 isOrderMarket ? null : ComplexOrderStrategyType.None,
-                limitPrice.RoundToSignificantDigits(4),
+                limitPrice,
                 stopPrice.RoundToSignificantDigits(4));
 
             if (!string.IsNullOrEmpty(response))

@@ -97,7 +97,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private bool Unsubscribe(IEnumerable<Symbol> symbols)
         {
             var symbolsRemoved = false;
-            List<string> removedSymbols = new();
+            var removedSymbols = new List<string>();
             foreach (var symbol in symbols)
             {
                 if (!symbol.IsCanonical())
@@ -171,7 +171,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 var tokenTimeStampAsDateObj = DateTime.Parse(userPrincipals.StreamerInfo.TokenTimestamp).ToUniversalTime();
                 var tokenTimeStampAsMs = Time.DateTimeToUnixTimeStampMilliseconds(tokenTimeStampAsDateObj);
 
-                NameValueCollection queryString = HttpUtility.ParseQueryString(string.Empty);
+                var queryString = HttpUtility.ParseQueryString(string.Empty);
 
                 queryString.Add("userid", userPrincipals.Accounts[0].AccountId);
                 queryString.Add("company", userPrincipals.Accounts[0].Company);
@@ -644,7 +644,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            OrderStatus orderStatus = OrderStatus.Canceled;
+            var orderStatus = OrderStatus.Canceled;
 
             var orderId = order.Order.OrderKey.ToStringInvariant();
 
@@ -669,7 +669,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class
         {
-            XmlSerializer serializer = new XmlSerializer(typeof(T));
+            var serializer = new XmlSerializer(typeof(T));
 
             using (TextReader reader = new StringReader(xml))
             {

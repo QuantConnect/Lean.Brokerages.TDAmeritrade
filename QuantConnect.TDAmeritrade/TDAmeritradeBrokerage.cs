@@ -89,23 +89,23 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var response = default(T);
 
-            var raw = RestClient.Execute(request);
+            var untypedResponse = RestClient.Execute(request);
 
-            if (!raw.IsSuccessful)
+            if (!untypedResponse.IsSuccessful)
             {
-                if (raw.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
+                if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
                     PostAccessToken(GrantType.RefreshToken, string.Empty);
                     Execute<T>(request, rootName);
                 }
                 else if (request.Resource == "oauth2/token")
                 {
-                    throw new BrokerageException($"TDAmeritradeBrokerage.Execute.{request.Resource}: authorization request is invalid, Response:{raw.Content}");
+                    throw new BrokerageException($"TDAmeritradeBrokerage.Execute.{request.Resource}: authorization request is invalid, Response:{untypedResponse.Content}");
                 }
-                else if (!string.IsNullOrEmpty(raw.Content))
+                else if (!string.IsNullOrEmpty(untypedResponse.Content))
                 {
-                    var fault = JsonConvert.DeserializeObject<ErrorModel>(raw.Content);
-                    Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {raw.Content}");
+                    var fault = JsonConvert.DeserializeObject<ErrorModel>(untypedResponse.Content);
+                    Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {untypedResponse.Content}");
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
                     return (T)(object)fault.Error;
                 }
@@ -115,19 +115,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 if (typeof(T) == typeof(String))
                 {
-                    return (T)(object)raw.Content;
+                    return (T)(object)untypedResponse.Content;
                 }
 
                 if (!string.IsNullOrEmpty(rootName))
                 {
-                    if (TryDeserializeRemoveRoot(raw.Content, rootName, out response))
+                    if (TryDeserializeRemoveRoot(untypedResponse.Content, rootName, out response))
                     {
                         return response;
                     }
                 }
                 else
                 {
-                    return JsonConvert.DeserializeObject<T>(raw.Content);
+                    return JsonConvert.DeserializeObject<T>(untypedResponse.Content);
                 }
             }
             catch (Exception e)
@@ -151,7 +151,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
 
-            decimal limitPrice = 0m;
+            var limitPrice = 0m;
             if (!isOrderMarket)
             {
                 var limitPriceWithoudRound =
@@ -161,7 +161,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            decimal stopPrice = 0m;
+            var stopPrice = 0m;
             if (order.Type == Orders.OrderType.StopLimit)
             {
                 var stopPriceWithoudRound = (order as StopLimitOrder)?.StopPrice ?? 0;
@@ -169,19 +169,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            var response = PostPlaceOrder(order.Type.ConvertLeanOrderTypeToExchange(),
+            var placeOrderResponse = PostPlaceOrder(order.Type.ConvertLeanOrderTypeToExchange(),
                 SessionType.Normal,
                 DurationType.Day,
                 OrderStrategyType.Single,
                 orderLegCollection,
                 isOrderMarket ? null : ComplexOrderStrategyType.None,
                 limitPrice,
-                stopPrice.RoundToSignificantDigits(4));
+                stopPrice);
 
-            if (!string.IsNullOrEmpty(response))
+            if (!string.IsNullOrEmpty(placeOrderResponse))
             {
-                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = response });
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, response));
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = placeOrderResponse });
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, placeOrderResponse));
                 return false;
             }
 

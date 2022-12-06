@@ -236,7 +236,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 // mark start;
                 var rest = new RestClient(_restApiUrl);
-                var req2 = new RestRequest("oauth2/token", Method.POST);                
+                var req2 = new RestRequest("oauth2/token", Method.POST);
+                req.AddHeader("Content-Type","application/x-www-form-urlencoded");                
                 foreach (var kv in body) {
                     req2.AddParameter(kv.Key, kv.Value, ParameterType.GetOrPost);
                 }

@@ -209,51 +209,36 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <exception cref="Exception"></exception>
         public AccessTokenModel PostAccessToken(GrantType grantType, string code)
         {
-            var path = _restApiUrl + "oauth2/token";
+            var request = new RestRequest("oauth2/token", Method.POST);
 
-            using (var client = new HttpClient())
+            var body = new Dictionary<string, string>();
+
+            body["grant_type"] = grantType.GetEnumMemberValue();
+
+            if (grantType == GrantType.RefreshToken)
+                body["refresh_token"] = _refreshToken;
+
+            if (grantType == GrantType.AuthorizationCode)
+                body["access_type"] = "offline";
+
+            if (grantType == GrantType.AuthorizationCode)
+                body["code"] = HttpUtility.UrlDecode(code);
+
+            body["client_id"] = _consumerKey + "@AMER.OAUTHAP";
+
+            if (grantType == GrantType.AuthorizationCode)
+                body["redirect_uri"] = "http://localhost";       
+
+            foreach (var kv in body)
             {
-                var body = new Dictionary<string, string>();
-
-                body["grant_type"] = grantType.GetEnumMemberValue();
-
-                if (grantType == GrantType.RefreshToken)
-                    body["refresh_token"] = _refreshToken;
-
-                if (grantType == GrantType.AuthorizationCode)
-                    body["access_type"] = "offline";
-
-                if (grantType == GrantType.AuthorizationCode)
-                    body["code"] = HttpUtility.UrlDecode(code);
-
-                body["client_id"] = _consumerKey + "@AMER.OAUTHAP";
-
-                if (grantType == GrantType.AuthorizationCode)
-                    body["redirect_uri"] = "http://localhost";
-
-                var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(body) };
-                var res = client.Send(req);
-
-                // mark start;
-                var rest = new RestClient(_restApiUrl);
-                var req2 = new RestRequest("oauth2/token", Method.POST);                
-                foreach (var kv in body) {
-                    req2.AddParameter(kv.Key, kv.Value, ParameterType.GetOrPost);
-                }
-                var res2 = rest.Execute(req2);
-                // mark end;
-
-                switch (res.StatusCode)
-                {
-                    case HttpStatusCode.OK:
-                        var accessTokens = JsonConvert.DeserializeObject<AccessTokenModel>(res.Content.ReadAsStringAsync().GetAwaiter().GetResult());
-                        RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
-                        return accessTokens;
-                    default:
-                        Log.Error($"TDAmeritrade.SignIn: StatusCode:{res.StatusCode}, ReasonPhrase:{res.ReasonPhrase}");
-                        throw new Exception($"{res.StatusCode} {res.ReasonPhrase}");
-                }
+                request.AddParameter(kv.Key, kv.Value, ParameterType.GetOrPost);
             }
+
+            var accessTokens = Execute<AccessTokenModel>(request);
+
+            RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
+
+            return accessTokens;
         }
 
         /// <summary>

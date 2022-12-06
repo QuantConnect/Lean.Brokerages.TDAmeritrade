@@ -50,11 +50,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string _wsUrl = "wss://streamer-ws.tdameritrade.com/ws";
 
         private readonly IAlgorithm _algorithm;
-        private ISecurityProvider _securityProvider;
         private readonly IDataAggregator _aggregator;
         private readonly IOrderProvider _orderProvider;
 
-        private readonly FixedSizeHashQueue<int> _cancelledQcOrderIDs = new FixedSizeHashQueue<int>(10000);
         private readonly TDAmeritradeSymbolMapper _symbolMapper;
 
         /// <summary>
@@ -70,7 +68,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string accessToken,
             string accountNumber,
             IAlgorithm algorithm,
-            ISecurityProvider securityProvider,
             IDataAggregator aggregator,
             IOrderProvider orderProvider,
             IMapFileProvider mapFileProvider) : base("TD Ameritrade")
@@ -79,7 +76,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _accessToken = accessToken;
             _accountNumber = accountNumber;
             _algorithm = algorithm;
-            _securityProvider = securityProvider;
             _aggregator = aggregator;
             _orderProvider = orderProvider;
             _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);

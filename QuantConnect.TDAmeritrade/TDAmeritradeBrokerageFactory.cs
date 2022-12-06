@@ -52,7 +52,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var accessToken = Read<string>(job.BrokerageData, "tdameritrade-access-token", errors);
             var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
-            var brokerage = new TDAmeritradeBrokerage(consumerKey, accessToken, accountNumber, algorithm, algorithm.Portfolio,
+            var brokerage = new TDAmeritradeBrokerage(consumerKey, accessToken, accountNumber, algorithm,
                 Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false), algorithm.Transactions,
                 Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")));
 

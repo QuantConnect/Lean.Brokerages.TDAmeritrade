@@ -20,7 +20,7 @@ using System.Runtime.Serialization;
 
 namespace QuantConnect.Brokerages.TDAmeritrade.Utils
 {
-    public static class EnumConverterExtension
+    public static class Extensions
     {
         public static string GetProjectionTypeInRequestFormat(this ProjectionType projectType) => projectType switch
         {
@@ -170,5 +170,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             OrderDirection.Sell => InstructionType.Sell,
             _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderDirection {nameof(orderDirection)}")
         };
+
+        /// <summary>
+        /// Orders above $1 can be entered in no more than 2 decimals; orders below $1 can be entered in no more than 4 decimals
+        /// </summary>
+        /// <param name="amount"></param>
+        /// <returns></returns>
+        public static decimal RoundAmountToExachangeFormat(this decimal amount)
+            => amount < 1m ? amount.RoundToSignificantDigits(4) : amount.RoundToSignificantDigits(2);
     }
 }

@@ -27,7 +27,9 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             {
                 return new[]
                 {
+                    new TestCaseData(Symbols.AAPL, Resolution.Tick, false),
                     new TestCaseData(Symbols.AAPL, Resolution.Minute, false),
+                    new TestCaseData(Symbols.AAPL, Resolution.Second, false),
                 };
             }
         }
@@ -56,7 +58,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                 ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
                     cancelationToken,
                     (baseData) => {
-                        if (baseData != null) { Log.Trace("{baseData}"); }
+                        if (baseData != null) { Log.Trace($"{baseData}"); }
                     });
             }
 

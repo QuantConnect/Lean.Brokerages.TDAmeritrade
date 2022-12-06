@@ -320,7 +320,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             try
             {
-                var productId = 221; // TODO: it must change
+                var productId = 226;
                 var userId = Config.GetInt("job-user-id");
                 var token = Config.Get("api-access-token");
                 var organizationId = Config.Get("job-organization-id", null);

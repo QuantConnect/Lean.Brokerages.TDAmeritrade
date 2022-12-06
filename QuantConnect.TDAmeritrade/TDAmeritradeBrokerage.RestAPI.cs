@@ -18,7 +18,6 @@ using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Brokerages.TDAmeritrade.Utils;
 using QuantConnect.Logging;
 using RestSharp;
-using System.Net;
 using System.Web;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
@@ -51,7 +50,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="needExtendedHoursData">true to return extended hours data, false for regular market hours only.</param>
         /// <returns></returns>
         private CandleListModel GetPriceHistory(
-            Symbol symbol, 
+            Symbol symbol,
             PeriodType periodType,
             int period,
             FrequencyType frequencyType,
@@ -73,25 +72,39 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             ///</example>
 
             if (periodType != PeriodType.Day)
+            {
                 request.AddQueryParameter("periodType", periodType.GetEnumMemberValue());
+            }
 
             if (IsValidPeriodByPeriodType(periodType, period))
+            {
                 request.AddQueryParameter("period", period.ToStringInvariant());
+            }
 
             if (IsValidFrequencyTypeByPeriodType(periodType, frequencyType))
+            {
                 request.AddQueryParameter("frequencyType", frequencyType.GetEnumMemberValue());
+            }
 
             if (IsValidFrequencyByFrequencyType(frequencyType, frequency))
+            {
                 request.AddQueryParameter("frequency", frequency.ToStringInvariant());
+            }
 
             if (startDate.HasValue && (endDate.HasValue ? endDate.Value > startDate.Value : true))
+            {
                 request.AddQueryParameter("startDate", Math.Floor(Time.DateTimeToUnixTimeStampMilliseconds(startDate.Value)).ToStringInvariant());
+            }
 
             if (endDate.HasValue && (startDate.HasValue ? startDate.Value < endDate.Value : true))
+            {
                 request.AddQueryParameter("endDate", Math.Floor(Time.DateTimeToUnixTimeStampMilliseconds(endDate.Value)).ToStringInvariant());
+            }
 
             if (!needExtendedHoursData)
+            {
                 request.AddQueryParameter("needExtendedHoursData", needExtendedHoursData.ToStringInvariant());
+            }
 
             return Execute<CandleListModel>(request);
         }
@@ -129,7 +142,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             foreach (var symbol in symbols)
             {
                 if (TryDeserializeRemoveRoot(jsonResponse, symbol, out QuoteTDAmeritradeModel result))
+                {
                     qutes.Add(result);
+                }
             }
 
             return qutes;
@@ -216,18 +231,26 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             body["grant_type"] = grantType.GetEnumMemberValue();
 
             if (grantType == GrantType.RefreshToken)
+            {
                 body["refresh_token"] = _refreshToken;
+            }
 
             if (grantType == GrantType.AuthorizationCode)
+            {
                 body["access_type"] = "offline";
+            }
 
             if (grantType == GrantType.AuthorizationCode)
+            {
                 body["code"] = HttpUtility.UrlDecode(code);
+            }
 
             body["client_id"] = _consumerKey + "@AMER.OAUTHAP";
 
             if (grantType == GrantType.AuthorizationCode)
-                body["redirect_uri"] = "http://localhost";       
+            {
+                body["redirect_uri"] = "http://localhost";
+            }
 
             foreach (var kv in body)
             {
@@ -271,10 +294,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var body = new Dictionary<string, object>();
 
             if (orderType != OrderType.Market)
+            {
                 body["complexOrderStrategyType"] = complexOrderStrategyType.GetEnumValue();
+            }
 
             if (orderType != OrderType.Market)
+            {
                 body["price"] = price;
+            }
 
             body["orderType"] = orderType.GetEnumMemberValue();
             body["session"] = sessionType.GetEnumMemberValue();
@@ -282,8 +309,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             body["orderStrategyType"] = orderStrategyType.GetEnumMemberValue();
             body["orderLegCollection"] = orderLegCollectionModels;
 
-            if(orderType == OrderType.StopLimit)
+            if (orderType == OrderType.StopLimit)
+            {
                 body["stopPrice"] = stopPrice;
+            }
 
             request.AddJsonBody(JsonConvert.SerializeObject(body));
 
@@ -350,7 +379,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
 
             if (!res)
+            {
                 Log.Error($"TDAmeritrade.Execute.GetPriceHistory(): current perid: {period} doesn't support.");
+            }
 
             return res;
         }
@@ -386,7 +417,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
 
             if (!res)
+            {
                 Log.Error($"TDAmeritrade.Execute.GetPriceHistory(): current frequencyType: {nameof(frequencyType)} doesn't support.");
+            }
 
             return res;
         }
@@ -408,7 +441,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
 
             if (!res)
+            {
                 Log.Error($"TDAmeritrade.Execute.GetPriceHistory(): current frequency: {frequency} doesn't support by frequencyType: {nameof(frequencyType)}");
+            }
 
             return res;
         }
@@ -421,16 +456,24 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             OrderStatusType orderStatusType = OrderStatusType.NoValue)
         {
             if (maxResults.HasValue)
+            {
                 request.AddQueryParameter("maxResults", maxResults.Value.ToStringInvariant());
+            }
 
             if (fromEnteredTime.HasValue && (toEnteredTime.HasValue ? toEnteredTime.Value > fromEnteredTime.Value : true))
+            {
                 request.AddQueryParameter("fromEnteredTime", fromEnteredTime.Value.ToString("yyyy-MM-dd"));
+            }
 
             if (toEnteredTime.HasValue && (fromEnteredTime.HasValue ? fromEnteredTime.Value < toEnteredTime.Value : true))
+            {
                 request.AddQueryParameter("toEnteredTime", toEnteredTime.Value.ToString("yyyy-MM-dd"));
+            }
 
             if (orderStatusType != OrderStatusType.NoValue)
+            {
                 request.AddQueryParameter("status", orderStatusType.GetEnumValue());
+            }
 
             return Execute<List<OrderModel>>(request);
         }

@@ -118,7 +118,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             try
             {
                 if (typeof(T) == typeof(String))
+                {
                     return (T)(object)raw.Content;
+                }
 
                 if (!string.IsNullOrEmpty(rootName))
                 {
@@ -163,7 +165,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             decimal stopPrice = 0m;
             if (order.Type == Orders.OrderType.StopLimit)
+            {
                 stopPrice = (order as StopLimitOrder)?.StopPrice ?? 0;
+            }
 
             var response = PostPlaceOrder(order.Type.ConvertQCOrderTypeToExchange(),
                 SessionType.Normal,
@@ -282,11 +286,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             RestClient = new RestClient(_restApiUrl);
 
-            if(!string.IsNullOrEmpty(_accessToken) && string.IsNullOrEmpty(_refreshToken))
+            if (!string.IsNullOrEmpty(_accessToken) && string.IsNullOrEmpty(_refreshToken))
+            {
                 _refreshToken = PostAccessToken(GrantType.AuthorizationCode, _accessToken).RefreshToken;
+            }
 
-            if(!string.IsNullOrEmpty(_refreshToken))
+            if (!string.IsNullOrEmpty(_refreshToken))
+            {
                 PostAccessToken(GrantType.RefreshToken, string.Empty);
+            }
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
 

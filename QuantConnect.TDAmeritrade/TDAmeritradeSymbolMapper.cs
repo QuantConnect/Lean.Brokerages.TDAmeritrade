@@ -33,13 +33,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public string GetBrokerageSymbol(Symbol symbol)
         {
             if (symbol == null || string.IsNullOrWhiteSpace(symbol.Value))
+            {
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid symbol: " + (symbol == null ? "null" : symbol.ToString()));
+            }
 
             if (symbol.ID.SecurityType != SecurityType.Equity 
                 && symbol.ID.SecurityType != SecurityType.Option
                 && symbol.ID.SecurityType != SecurityType.Index
                 && symbol.ID.SecurityType != SecurityType.IndexOption)
+            {
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid security type: " + symbol.ID.SecurityType);
+            }
 
             return GetMappedTicker(symbol);
         }

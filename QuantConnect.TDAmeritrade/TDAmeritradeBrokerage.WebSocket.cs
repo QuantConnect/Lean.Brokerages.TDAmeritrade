@@ -36,7 +36,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// We're caching orders to increase speed of getting info about ones
         /// </summary>
-        private Queue<OrderModel> _cachedOrdersFromWebSocket = new Queue<OrderModel>(); 
+        private Queue<OrderModel> _cachedOrdersFromWebSocket = new Queue<OrderModel>();
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -212,7 +212,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 };
 
                 WebSocket.Send(JsonConvert.SerializeObject(request));
-                
+
                 // After login, we need to subscribe to account's Trade activity chanel
                 SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
             }
@@ -478,7 +478,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     break;
                 case "service":
                     if (token["content"]["code"].Value<int>() == 30)
+                    {
                         Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleNotify: {token["content"]["msg"]}");
+                    }
                     break;
             }
         }
@@ -487,7 +489,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var charts = content.ToObject<List<ChartEquityModel>>() ?? new List<ChartEquityModel>(0);
 
-            foreach(var chart in charts)
+            foreach (var chart in charts)
             {
                 var symbolLean = _symbolMapper.GetSymbolFromWebsocket(chart.Symbol);
 
@@ -514,13 +516,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 DefaultOrderBook symbolOrderBook;
                 if (!_subscribedTickers.TryGetValue(symbolLean, out symbolOrderBook))
+                {
                     continue;
+                }
 
                 if (symbol.BidPrice > 0)
+                {
                     symbolOrderBook.UpdateBidRow(symbol.BidPrice, symbol.BidSize);
+                }
 
                 if (symbol.AskPrice > 0)
+                {
                     symbolOrderBook.UpdateAskRow(symbol.AskPrice, symbol.AskSize);
+                }
 
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
@@ -537,7 +545,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var accountActivityData = content.ToObject<List<AccountActivityResponseModel>>()?.First();
 
             if (!accountActivityData.HasValue)
+            {
                 return;
+            }
 
             switch (accountActivityData.Value.MessageType)
             {
@@ -581,7 +591,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void HandleSubmitNewOrder(OrderEntryRequestMessage? order)
         {
-            if(order == null)
+            if (order == null)
             {
                 return;
             }
@@ -598,7 +608,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void HandleOrderFill(OrderFillMessage? order)
         {
-            if(order == null)
+            if (order == null)
             {
                 return;
             }
@@ -629,7 +639,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void HandleOrderCancelRequest(OrderCancelRequestMessage? order)
         {
-            if(order == null)
+            if (order == null)
             {
                 return;
             }

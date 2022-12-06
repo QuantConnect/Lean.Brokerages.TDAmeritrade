@@ -45,6 +45,8 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         {
             var url = _brokerage.GetSignInUrl();
 
+            QuantConnect.Logging.Log.Trace($"TDAmeritradeBrokerage: URL: {url}");
+
             Assert.That(url, Is.Not.Null);
             Assert.That(url, Is.Not.Empty);
             Assert.That(url, Does.Contain(_apiKey));

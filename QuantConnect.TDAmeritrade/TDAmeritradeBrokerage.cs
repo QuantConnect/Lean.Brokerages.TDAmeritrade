@@ -266,8 +266,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     AveragePrice = hold.AveragePrice,
                     MarketPrice = hold.MarketValue,
                     Quantity = hold.LongQuantity + hold.ShortQuantity,
-                    MarketValue = hold.MarketValue,
-                    UnrealizedPnL = hold.CurrentDayProfitLossPercentage // % or $ - ?
+                    MarketValue = hold.MarketValue
                 });
             }
             return holdings;

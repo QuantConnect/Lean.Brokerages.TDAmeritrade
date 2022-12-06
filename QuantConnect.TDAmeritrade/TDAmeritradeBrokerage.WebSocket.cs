@@ -557,14 +557,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "ERROR":
                     Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
                     break;
-                case "BrokenTrade": // After an order was filled, the trade is reversed or "Broken" and the order is changed to Canceled.
-                    break;
-                case "ManualExecution": // The order is manually entered (and filled) by the broker.  Usually due to some system issue.
-                    break;
-                case "OrderActivation": // A Stop order has been Activated
-                    break;
-                case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received (You will also get a UROUT for the original order)
-                    break;
                 case "OrderCancelRequest": // A request to cancel an order has been received
                     var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
                     HandleOrderCancelRequest(candelOrder);
@@ -576,15 +568,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "OrderFill": // An order has been completely filled
                     var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
                     HandleOrderFill(orderFill);
-                    break;
-                case "OrderPartialFill": // An order has been partial filled
-                    break;
-                case "OrderRejection": // An order was rejected
-                    break;
-                case "TooLateToCancel": // A request to cancel an order has been received but the order cannot be canceled either because it was already canceled, filled, or for some other reason
-                    break;
-                case "UROUT": // Indicates "You Are Out" - that the order has been canceled
-                    DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
                     break;
             }
         }

@@ -619,15 +619,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var time = order.ExecutionInformation.Timestamp;
 
-            var orderQC = _orderProvider.GetOrderByBrokerageId(orderId);
+            var orderLean = _orderProvider.GetOrderByBrokerageId(orderId);
 
-            if (orderQC == null)
+            if (orderLean == null)
             {
                 Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {orderId}");
                 return;
             }
 
-            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderFill")
+            var orderEvent = new OrderEvent(orderLean, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderFill")
             {
                 Status = orderStatus,
                 FillQuantity = order.ExecutionInformation.Quantity,
@@ -650,15 +650,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var time = order.LastUpdated;
 
-            var orderQC = _orderProvider.GetOrderByBrokerageId(orderId);
+            var orderLean = _orderProvider.GetOrderByBrokerageId(orderId);
 
-            if (orderQC == null)
+            if (orderLean == null)
             {
                 Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderCancelRequest(): Unable to locate order with BrokerageId: {orderId}");
                 return;
             }
 
-            var orderEvent = new OrderEvent(orderQC, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderCancel")
+            var orderEvent = new OrderEvent(orderLean, time, Orders.Fees.OrderFee.Zero, "TDAmeritradeBrokerage Order Event OrderCancel")
             {
                 Status = orderStatus,
                 FillQuantity = order.PendingCancelQuantity,

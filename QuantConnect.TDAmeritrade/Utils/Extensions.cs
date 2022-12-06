@@ -155,7 +155,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             }
         }
 
-        public static Models.OrderType ConvertQCOrderTypeToExchange(this Orders.OrderType orderType) => orderType switch
+        public static Models.OrderType ConvertLeanOrderTypeToExchange(this Orders.OrderType orderType) => orderType switch
         {
             Orders.OrderType.Market => Models.OrderType.Market,
             Orders.OrderType.Limit => Models.OrderType.Limit,
@@ -164,7 +164,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderType {nameof(orderType)}")
         };
 
-        public static InstructionType ConvertQCOrderDirectionToExchange(this OrderDirection orderDirection) => orderDirection switch
+        public static InstructionType ConvertLeanOrderDirectionToExchange(this OrderDirection orderDirection) => orderDirection switch
         {
             OrderDirection.Buy => InstructionType.Buy,
             OrderDirection.Sell => InstructionType.Sell,

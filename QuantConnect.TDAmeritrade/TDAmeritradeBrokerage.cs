@@ -147,7 +147,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var orderLegCollection = new List<PlaceOrderLegCollectionModel>()
             {
                 new PlaceOrderLegCollectionModel(
-                    order.Direction.ConvertQCOrderDirectionToExchange(),
+                    order.Direction.ConvertLeanOrderDirectionToExchange(),
                     Math.Abs(order.Quantity),
                     new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
                     )
@@ -173,7 +173,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            var response = PostPlaceOrder(order.Type.ConvertQCOrderTypeToExchange(),
+            var response = PostPlaceOrder(order.Type.ConvertLeanOrderTypeToExchange(),
                 SessionType.Normal,
                 DurationType.Day,
                 OrderStrategyType.Single,

@@ -234,6 +234,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(body) };
                 var res = client.Send(req);
 
+                // mark start;
+                var rest = new RestClient(_restApiUrl);
+                var req2 = new RestRequest("oauth2/token", Method.POST);                
+                foreach (var kv in body) {
+                    req2.AddParameter(kv.Key, kv.Value, ParameterType.GetOrPost);
+                }
+                var res2 = rest.Execute(req2);
+                // mark end;
+
                 switch (res.StatusCode)
                 {
                     case HttpStatusCode.OK:

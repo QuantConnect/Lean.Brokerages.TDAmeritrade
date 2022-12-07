@@ -677,23 +677,33 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var brokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
+            var oldBrokerageOrderKey = orderCancelReplaceMessage.OriginalOrderId.ToStringInvariant();
+            OrderModel cashedOrder = TryGetCashedOrder(oldBrokerageOrderKey);
 
             if (cashedOrder == null)
             {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
+                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {oldBrokerageOrderKey}");
                 return;
             }
 
+            var newBrokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey;
+
             cashedOrder.Status = OrderStatusType.Replaced;
+            cashedOrder.OrderId = newBrokerageOrderKey;
 
             cashedOrder.Price = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingLimit)?.Limit ??
                                 (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Limit ?? 0m;
             cashedOrder.StopPrice = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopMarket)?.Stop ??
                                     (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m;
             cashedOrder.Quantity = orderCancelReplaceMessage.PendingCancelQuantity;
-            _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
+
+            // add new order to cache collection
+            _cachedOrdersFromWebSocket[newBrokerageOrderKey.ToStringInvariant()] = cashedOrder;
+            // remove order from cache collection
+            _cachedOrdersFromWebSocket.Remove(oldBrokerageOrderKey);
+
+            // Reset Event for UpdateOrder mthd()
+            _onOrderWebSocketResponseEvent.Set();
         }
 
         private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class

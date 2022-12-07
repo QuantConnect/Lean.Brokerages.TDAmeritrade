@@ -139,7 +139,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             _ => throw new ArgumentOutOfRangeException(nameof(orderStrategyType), $"Not expected OrderStrategyType value: {orderStrategyType}")
         };
 
-        public static string ConvertComplexOrderStrategyTypeToString(this ComplexOrderStrategyType? complexOrderStrategyType) => complexOrderStrategyType switch
+        public static string ConvertComplexOrderStrategyTypeToString(this ComplexOrderStrategyType complexOrderStrategyType) => complexOrderStrategyType switch
         {
             ComplexOrderStrategyType.None => "NONE",
             ComplexOrderStrategyType.Covered => "COVERED",

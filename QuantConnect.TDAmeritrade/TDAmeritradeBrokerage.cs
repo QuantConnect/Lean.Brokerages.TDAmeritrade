@@ -140,43 +140,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override bool PlaceOrder(Order order)
         {
-            var orderLegCollection = new List<PlaceOrderLegCollectionModel>()
-            {
-                new PlaceOrderLegCollectionModel(
-                    order.Direction.ConvertLeanOrderDirectionToExchange(),
-                    Math.Abs(order.Quantity),
-                    new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
-                    )
-            };
 
-            var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
-
-            var limitPrice = 0m;
-            if (!isOrderMarket)
-            {
-                var limitPriceWithoudRound =
-                    (order as LimitOrder)?.LimitPrice ??
-                    (order as StopLimitOrder)?.LimitPrice ?? 0;
-
-                limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
-            }
-
-            var stopPrice = 0m;
-            if (order.Type == Orders.OrderType.StopLimit)
-            {
-                var stopPriceWithoudRound = (order as StopLimitOrder)?.StopPrice ?? 0;
-
-                stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
-            }
-
-            var placeOrderResponse = PostPlaceOrder(order.Type.ConvertLeanOrderTypeToExchange(),
-                SessionType.Normal,
-                DurationType.Day,
-                OrderStrategyType.Single,
-                orderLegCollection,
-                isOrderMarket ? null : ComplexOrderStrategyType.None,
-                limitPrice,
-                stopPrice);
+            var placeOrderResponse = PostPlaceOrder(order);
 
             if (!string.IsNullOrEmpty(placeOrderResponse))
             {
@@ -205,9 +170,60 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return true;
         }
 
+        /// <summary>
+        /// Updates the order with the same id
+        /// </summary>
+        /// <param name="order">The new order information</param>
+        /// <returns>True if the request was made for the order to be updated, false otherwise</returns>
         public override bool UpdateOrder(Order order)
         {
-            throw new NotImplementedException();
+            Log.Trace("TDAmeritradeBrokerage.UpdateOrder(): " + order);
+
+            if (!order.BrokerId.Any())
+            {
+                // we need the brokerage order id in order to perform an update
+                Log.Trace("TDAmeritradeBrokerage.UpdateOrder(): Unable to update order without BrokerId.");
+                return false;
+            }
+
+            var replaceOrderResponse = ReplaceOrder(order);
+
+            // check if the updated (marketable) order was filled
+            if (!string.IsNullOrEmpty(replaceOrderResponse))
+            {
+                OrderModel cashedOrder = TryGetCashedOrder(order.BrokerId[0]);
+
+                if(cashedOrder != null && cashedOrder.OrderId.ToStringInvariant() == order.BrokerId[0] && cashedOrder.Status == OrderStatusType.Filled)
+                {
+                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "Oanda Fill Event")
+                    {
+                        Status = OrderStatus.Filled,
+                        FillPrice = cashedOrder.Price,
+                        FillQuantity = cashedOrder.Quantity
+                    });
+                    
+                    return true;
+                }
+            }
+
+            var orderResponse = new OrderModel();
+
+            if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
+            {
+                orderResponse = GetOrdersByPath().First(); // The list is reversed                
+            }
+            else
+            {
+                orderResponse = _cachedOrdersFromWebSocket.Last().Value;
+            }
+            _onOrderWebSocketResponseEvent.Reset();
+
+            // replace the brokerage order id
+            order.BrokerId[0] = orderResponse.OrderId.ToStringInvariant();
+
+            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
+
+            return true;
         }
 
         public override bool CancelOrder(Order order)

@@ -282,53 +282,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Place an order for a specific account.
         /// </summary>
-        /// <param name="orderType">Market | Limit</param>
-        /// <param name="sessionType">Market | Limit</param>
-        /// <param name="durationType">Market | Limit</param>
-        /// <param name="orderStrategyType">Market | Limit</param>
-        /// <param name="orderLegCollectionModels">Market</param>
-        /// <param name="complexOrderStrategyType">Limit</param>
-        /// <param name="price">Limit</param>
-        /// <param name="activationPrice">Stop Limit</param>
+        /// <param name="Orders.Order">Lean Order</param>
         /// <returns></returns>
-        private string PostPlaceOrder(
-            OrderType orderType,
-            SessionType sessionType,
-            DurationType durationType,
-            OrderStrategyType orderStrategyType,
-            List<PlaceOrderLegCollectionModel> orderLegCollectionModels,
-            ComplexOrderStrategyType? complexOrderStrategyType = null,
-            decimal price = 0m,
-            decimal stopPrice = 0m)
+        private string PostPlaceOrder(Orders.Order order)
         {
             var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.POST);
 
-            var body = new Dictionary<string, object>();
+            var requestBody = GenerateOrderRequest(order);
 
-            if (orderType != OrderType.Market)
-            {
-                body["complexOrderStrategyType"] = complexOrderStrategyType.ConvertComplexOrderStrategyTypeToString();
-            }
+            request.AddJsonBody(requestBody);
 
-            if (orderType != OrderType.Market)
-            {
-                body["price"] = price;
-            }
-
-            body["orderType"] = orderType.ConvertOrderTypeToString();
-            body["session"] = sessionType.ConvertSessionTypeToString();
-            body["duration"] = durationType.ConvertDurationTypeToString();
-            body["orderStrategyType"] = orderStrategyType.ConvertOrderStrategyTypeToString();
-            body["orderLegCollection"] = orderLegCollectionModels;
-
-            if (orderType == OrderType.StopLimit)
-            {
-                body["stopPrice"] = stopPrice;
-            }
-
-            request.AddJsonBody(JsonConvert.SerializeObject(body));
-
-            return Execute<string>(request); // Place Order
+            return Execute<string>(request);
         }
 
         public bool CancelOrder(string orderNumber, string? accountNumber = null)
@@ -342,6 +306,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #endregion
 
+        #region PUT
+
+        public string ReplaceOrder(Orders.Order order)
+        {
+            var request = new RestRequest($"accounts/{_accountNumber}/orders/{order.BrokerId[0]}", Method.PUT);
+
+            var requestBody = GenerateOrderRequest(order);
+
+            request.AddJsonBody(requestBody);
+
+            return Execute<string>(request);
+        }
+
+        #endregion
 
         #region TDAmeritrade Helpers
 
@@ -488,6 +466,71 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             return Execute<List<OrderModel>>(request);
+        }
+
+        /// <summary>
+        /// Generates an TDAmeritradeBrokerage order request
+        /// </summary>
+        /// <param name="order">The LEAN order</param>
+        /// <returns>The request in JSON format</returns>
+        private string GenerateOrderRequest(Orders.Order order)
+        {
+            var instrument = _symbolMapper.GetBrokerageSymbol(order.Symbol);
+
+            var body = new Dictionary<string, object>();
+
+            var orderLegCollection = new List<PlaceOrderLegCollectionModel>()
+            {
+                new PlaceOrderLegCollectionModel(
+                    order.Direction.ConvertLeanOrderDirectionToExchange(),
+                    Math.Abs(order.Quantity),
+                    new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
+                    )
+            };
+
+            var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
+
+            var brokerageOrderType = order.Type.ConvertLeanOrderTypeToExchange();
+
+            if (brokerageOrderType != OrderType.Market)
+            {
+                body["complexOrderStrategyType"] = ComplexOrderStrategyType.None.ConvertComplexOrderStrategyTypeToString();
+            }
+
+            var limitPrice = 0m;
+            if (!isOrderMarket)
+            {
+                var limitPriceWithoudRound =
+                    (order as Orders.LimitOrder)?.LimitPrice ??
+                    (order as Orders.StopLimitOrder)?.LimitPrice ?? 0m;
+
+                limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
+            }
+
+            if (brokerageOrderType != OrderType.Market)
+            {
+                body["price"] = limitPrice;
+            }
+
+            body["orderType"] = brokerageOrderType.ConvertOrderTypeToString();
+            body["session"] = SessionType.Normal.ConvertSessionTypeToString();
+            body["duration"] = DurationType.Day.ConvertDurationTypeToString();
+            body["orderStrategyType"] = OrderStrategyType.Single.ConvertOrderStrategyTypeToString();
+            body["orderLegCollection"] = orderLegCollection;
+
+            var stopPrice = 0m;
+            if (order.Type == Orders.OrderType.StopLimit)
+            {
+                var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ?? 0;
+                stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
+            }
+
+            if (brokerageOrderType == OrderType.StopLimit)
+            {
+                body["stopPrice"] = stopPrice;
+            }
+
+            return JsonConvert.SerializeObject(body);
         }
 
         #endregion

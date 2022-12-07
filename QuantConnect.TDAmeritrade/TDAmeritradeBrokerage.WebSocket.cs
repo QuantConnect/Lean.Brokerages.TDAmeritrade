@@ -22,7 +22,6 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Packets;
 using System.Collections.Concurrent;
-using System.Collections.Specialized;
 using System.Web;
 using System.Xml.Serialization;
 
@@ -37,6 +36,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// We're caching orders to increase speed of getting info about ones
         /// </summary>
         private Queue<OrderModel> _cachedOrdersFromWebSocket = new Queue<OrderModel>();
+
+        private Dictionary<Type, XmlSerializer> _serializers = new Dictionary<Type, XmlSerializer>()
+        {
+            { typeof(OrderCancelRequestMessage), new XmlSerializer(typeof(OrderCancelRequestMessage))},
+            { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
+            { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))}
+        };
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -652,9 +658,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class
         {
-            var serializer = new XmlSerializer(typeof(T));
+            XmlSerializer serializer = _serializers[typeof(T)];
 
-            using (TextReader reader = new StringReader(xml))
+            using (var reader = new StringReader(xml))
             {
                 try
                 {

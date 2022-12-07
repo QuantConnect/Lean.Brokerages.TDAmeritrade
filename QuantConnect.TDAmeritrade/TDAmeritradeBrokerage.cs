@@ -58,7 +58,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Thread synchronization event, for successful Place Order
         /// </summary>
-        private ManualResetEvent _successPlaceOrderEvent = new ManualResetEvent(false);
+        private ManualResetEvent _onOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
         { }
@@ -187,15 +187,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var orderResponse = new OrderModel();
 
-            if (!_successPlaceOrderEvent.WaitOne(TimeSpan.FromSeconds(5)))
+            if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
             {
                 orderResponse = GetOrdersByPath().First(); // The list is reversed                
             }
             else
             {
-                orderResponse = _cachedOrdersFromWebSocket.Dequeue();
+                orderResponse = _cachedOrdersFromWebSocket.Last().Value;
             }
-            _successPlaceOrderEvent.Reset();
+            _onOrderWebSocketResponseEvent.Reset();
 
             order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 
@@ -217,6 +217,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             foreach (var id in order.BrokerId)
             {
                 var isCancelSuccess = CancelOrder(id);
+
+                if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
+                {
+                    isCancelSuccess = GetOrderByNumber(id).Status == OrderStatusType.Canceled;              
+                }
+                else
+                {
+                    isCancelSuccess = _cachedOrdersFromWebSocket[id].Status == OrderStatusType.Canceled;
+                }
+                _onOrderWebSocketResponseEvent.Reset();
 
                 if (isCancelSuccess)
                 {

@@ -209,6 +209,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return Execute<UserPrincipalsModel>(request);
         }
 
+        /// <summary>
+        /// Get a specific order for a specific account.
+        /// </summary>
+        /// <param name="orderNumber">order number</param>
+        /// <returns>Brokerage OrderModel</returns>
+        public OrderModel GetOrderByNumber(string orderNumber)
+        {
+            var request = new RestRequest($"accounts/{_accountNumber}/orders/{orderNumber}", Method.GET);
+
+            return Execute<OrderModel>(request);
+        }
+
         #endregion
 
         #region POST

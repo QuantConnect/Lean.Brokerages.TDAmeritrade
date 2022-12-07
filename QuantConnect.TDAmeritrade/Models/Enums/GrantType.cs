@@ -13,8 +13,6 @@
  * limitations under the License.
 */
 
-using System.Runtime.Serialization;
-
 namespace QuantConnect.Brokerages.TDAmeritrade.Models
 {
     /// <summary>
@@ -22,9 +20,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
     /// </summary>
     public enum GrantType
     {
-        [EnumMember(Value = "authorization_code")]
         AuthorizationCode = 0,
-        [EnumMember(Value = "refresh_token")]
         RefreshToken = 1
     }
 }

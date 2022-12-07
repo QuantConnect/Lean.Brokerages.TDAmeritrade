@@ -73,7 +73,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (periodType != PeriodType.Day)
             {
-                request.AddQueryParameter("periodType", periodType.GetEnumMemberValue());
+                request.AddQueryParameter("periodType", periodType.ConvertPeriodTypeToString());
             }
 
             if (IsValidPeriodByPeriodType(periodType, period))
@@ -83,7 +83,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (IsValidFrequencyTypeByPeriodType(periodType, frequencyType))
             {
-                request.AddQueryParameter("frequencyType", frequencyType.GetEnumMemberValue());
+                request.AddQueryParameter("frequencyType", frequencyType.ConvertFrequencyTypeToString());
             }
 
             if (IsValidFrequencyByFrequencyType(frequencyType, frequency))
@@ -228,7 +228,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var body = new Dictionary<string, string>();
 
-            body["grant_type"] = grantType.GetEnumMemberValue();
+            body["grant_type"] = grantType.ConvertGrantTypeToString();
 
             if (grantType == GrantType.RefreshToken)
             {
@@ -295,7 +295,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (orderType != OrderType.Market)
             {
-                body["complexOrderStrategyType"] = complexOrderStrategyType.GetEnumValue();
+                body["complexOrderStrategyType"] = complexOrderStrategyType.ConvertComplexOrderStrategyTypeToString();
             }
 
             if (orderType != OrderType.Market)
@@ -303,10 +303,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 body["price"] = price;
             }
 
-            body["orderType"] = orderType.GetEnumMemberValue();
-            body["session"] = sessionType.GetEnumMemberValue();
-            body["duration"] = durationType.GetEnumMemberValue();
-            body["orderStrategyType"] = orderStrategyType.GetEnumMemberValue();
+            body["orderType"] = orderType.ConvertOrderTypeToString();
+            body["session"] = sessionType.ConvertSessionTypeToString();
+            body["duration"] = durationType.ConvertDurationTypeToString();
+            body["orderStrategyType"] = orderStrategyType.ConvertOrderStrategyTypeToString();
             body["orderLegCollection"] = orderLegCollectionModels;
 
             if (orderType == OrderType.StopLimit)
@@ -472,7 +472,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (orderStatusType != OrderStatusType.NoValue)
             {
-                request.AddQueryParameter("status", orderStatusType.GetEnumValue());
+                request.AddQueryParameter("status", orderStatusType.ConvertOrderStatusTypeToString());
             }
 
             return Execute<List<OrderModel>>(request);

@@ -17,6 +17,7 @@ using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Orders;
 using System.Reflection;
 using System.Runtime.Serialization;
+using OrderTypeBrokerage = QuantConnect.Brokerages.TDAmeritrade.Models.OrderType;
 
 namespace QuantConnect.Brokerages.TDAmeritrade.Utils
 {
@@ -29,16 +30,160 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             _ => throw new ArgumentOutOfRangeException(nameof(projectType), $"Not expected direction value: {projectType}")
         };
 
-        public static string? GetEnumMemberValue<T>(this T value)
-            where T : Enum
+        public static string ConvertInstructionTypeToString(this InstructionType instructionType) => instructionType switch
         {
-            return typeof(T)
-                .GetTypeInfo()
-                .DeclaredMembers
-                .SingleOrDefault(x => x.Name == value.ToString())
-                ?.GetCustomAttribute<EnumMemberAttribute>(false)
-                ?.Value;
-        }
+            InstructionType.Buy => "BUY",
+            InstructionType.Sell => "SELL",
+            InstructionType.BuyToCover => "BUY_TO_COVER",
+            InstructionType.BuyToOpen => "BUY_TO_OPEN",
+            InstructionType.BuyToClose => "BUY_TO_CLOSE",
+            InstructionType.SellToOpen => "SELL_TO_OPEN",
+            InstructionType.SellToClose => "SELL_TO_CLOSE",
+            InstructionType.Exchange => "EXCHANGE",
+            _ => throw new ArgumentOutOfRangeException(nameof(instructionType), $"Not expected InstructionType value: {instructionType}")
+        };
+
+        public static InstructionType ConvertStringToInstructionType(this string instructionType) => instructionType switch
+        {
+            "BUY" => InstructionType.Buy,
+            "SELL" => InstructionType.Sell,
+            "BUY_TO_COVER" => InstructionType.BuyToCover,
+            "BUY_TO_OPEN" => InstructionType.BuyToOpen,
+            "BUY_TO_CLOSE" => InstructionType.BuyToClose,
+            "SELL_TO_OPEN" => InstructionType.SellToOpen,
+            "SELL_TO_CLOSE" => InstructionType.SellToClose,
+            "EXCHANGE" => InstructionType.Exchange,
+            _ => throw new ArgumentOutOfRangeException(nameof(instructionType), $"Not expected InstructionType value: {instructionType}")
+        };
+
+        public static string ConvertPeriodTypeToString(this PeriodType periodType) => periodType switch
+        {
+            PeriodType.Day => "day",
+            PeriodType.Month => "month",
+            PeriodType.Year => "year",
+            PeriodType.Ytd => "ytd",
+            _ => throw new ArgumentOutOfRangeException(nameof(periodType), $"Not expected PeriodType value: {periodType}")
+        };
+
+        public static string ConvertFrequencyTypeToString(this FrequencyType frequencyType) => frequencyType switch
+        {
+            FrequencyType.NoValue => "novalue",
+            FrequencyType.Minute => "minute",
+            FrequencyType.Daily => "daily",
+            FrequencyType.Weekly => "weekly",
+            FrequencyType.Monthly => "monthly",
+            _ => throw new ArgumentOutOfRangeException(nameof(frequencyType), $"Not expected FrequencyType value: {frequencyType}")
+        };
+
+        public static string ConvertGrantTypeToString(this GrantType grantType) => grantType switch
+        {
+            GrantType.AuthorizationCode => "authorization_code",
+            GrantType.RefreshToken => "refresh_token",
+            _ => throw new ArgumentOutOfRangeException(nameof(grantType), $"Not expected GrantType value: {grantType}")
+        };
+
+        public static string ConvertOrderTypeToString(this OrderTypeBrokerage orderType) => orderType switch
+        {
+            OrderTypeBrokerage.Market => "MARKET",
+            OrderTypeBrokerage.Limit => "LIMIT",
+            OrderTypeBrokerage.Stop => "STOP",
+            OrderTypeBrokerage.StopLimit => "STOP_LIMIT",
+            OrderTypeBrokerage.TrailingStop => "TRAILING_STOP",
+            OrderTypeBrokerage.MarketOnClose => "MARKET_ON_CLOSE",
+            OrderTypeBrokerage.Exercise => "EXERCISE",
+            OrderTypeBrokerage.TrailingStopLimit => "TRAILING_STOP_LIMIT",
+            OrderTypeBrokerage.NetDebit => "NET_DEBIT",
+            OrderTypeBrokerage.NetCredit => "NET_CREDIT",
+            OrderTypeBrokerage.NetZero => "NET_ZERO",
+            _ => throw new ArgumentOutOfRangeException(nameof(orderType), $"Not expected OrderTypeBrokerage value: {orderType}")
+        };
+
+        public static OrderTypeBrokerage ConvertStringToOrderTypeBrokerage(this string orderType) => orderType switch
+        {
+            "MARKET" => OrderTypeBrokerage.Market,
+            "LIMIT" => OrderTypeBrokerage.Limit,
+            "STOP" => OrderTypeBrokerage.Stop,
+            "STOP_LIMIT" => OrderTypeBrokerage.StopLimit,
+            "TRAILING_STOP" => OrderTypeBrokerage.TrailingStop,
+            "MARKET_ON_CLOSE" => OrderTypeBrokerage.MarketOnClose,
+            "EXERCISE" => OrderTypeBrokerage.Exercise,
+            "TRAILING_STOP_LIMIT" => OrderTypeBrokerage.TrailingStopLimit,
+            "NET_DEBIT" => OrderTypeBrokerage.NetDebit,
+            "NET_CREDIT" => OrderTypeBrokerage.NetCredit,
+            "NET_ZERO" => OrderTypeBrokerage.NetZero,
+            _ => throw new ArgumentOutOfRangeException(nameof(orderType), $"Not expected OrderTypeBrokerage value: {orderType}")
+        };
+
+        public static string ConvertSessionTypeToString(this SessionType sessionType) => sessionType switch
+        {
+            SessionType.Normal => "NORMAL",
+            SessionType.AM => "AM",
+            SessionType.PM => "PM",
+            SessionType.Seamless => "SEAMLESS",
+            _ => throw new ArgumentOutOfRangeException(nameof(sessionType), $"Not expected SessionType value: {sessionType}")
+        };
+
+        public static string ConvertDurationTypeToString(this DurationType durationType) => durationType switch
+        {
+            DurationType.Day => "DAY",
+            DurationType.GoodTillCancel => "GOOD_TILL_CANCEL",
+            DurationType.FullOrKill => "FILL_OR_KILL",
+            _ => throw new ArgumentOutOfRangeException(nameof(durationType), $"Not expected DurationType value: {durationType}")
+        };
+
+        public static string ConvertOrderStrategyTypeToString(this OrderStrategyType orderStrategyType) => orderStrategyType switch
+        {
+            OrderStrategyType.Single => "SINGLE",
+            OrderStrategyType.Oco => "OCO",
+            OrderStrategyType.Trigger => "TRIGGER",
+            _ => throw new ArgumentOutOfRangeException(nameof(orderStrategyType), $"Not expected OrderStrategyType value: {orderStrategyType}")
+        };
+
+        public static string ConvertComplexOrderStrategyTypeToString(this ComplexOrderStrategyType? complexOrderStrategyType) => complexOrderStrategyType switch
+        {
+            ComplexOrderStrategyType.None => "NONE",
+            ComplexOrderStrategyType.Covered => "COVERED",
+            ComplexOrderStrategyType.Vertical => "VERTICAL",
+            ComplexOrderStrategyType.BackRatio => "BACK_RATIO",
+            ComplexOrderStrategyType.Calendar => "CALENDAR",
+            ComplexOrderStrategyType.Diagonal => "DIAGONAL",
+            ComplexOrderStrategyType.Straddle => "STRADDLE",
+            ComplexOrderStrategyType.Strangle => "STRANGLE",
+            ComplexOrderStrategyType.CollarSynthetic => "COLLAR_SYNTHETIC",
+            ComplexOrderStrategyType.Butterfly => "BUTTERFLY",
+            ComplexOrderStrategyType.Condor => "CONDOR",
+            ComplexOrderStrategyType.IronCondor => "IRON_CONDOR",
+            ComplexOrderStrategyType.VerticalRoll => "VERTICAL_ROLL",
+            ComplexOrderStrategyType.CollarWithStock => "COLLAR_WITH_STOCK",
+            ComplexOrderStrategyType.DoubleDiagonal => "DOUBLE_DIAGONAL",
+            ComplexOrderStrategyType.UnbalancedButterfly => "UNBALANCED_BUTTERFLY",
+            ComplexOrderStrategyType.UnbalancedCondor => "UNBALANCED_CONDOR",
+            ComplexOrderStrategyType.UnbalancedIronCondor => "UNBALANCED_IRON_CONDOR",
+            ComplexOrderStrategyType.UnbalancedVerticalRoll => "UNBALANCED_VERTICAL_ROLL",
+            ComplexOrderStrategyType.Custom => "CUSTOM",
+            _ => throw new ArgumentOutOfRangeException(nameof(complexOrderStrategyType), $"Not expected ComplexOrderStrategyType value: {complexOrderStrategyType}")
+        };
+
+        public static string ConvertOrderStatusTypeToString(this OrderStatusType orderStatusType) => orderStatusType switch
+        {
+            OrderStatusType.NoValue => "No Value",
+            OrderStatusType.AwaitingParentOrder => "AWAITING_PARENT_ORDER",
+            OrderStatusType.AwaitingCondition => "AWAITING_CONDITION",
+            OrderStatusType.AwaitingManualReview => "AWAITING_MANUAL_REVIEW",
+            OrderStatusType.Accepted => "ACCEPTED",
+            OrderStatusType.AwaitingurOut => "AWAITING_UR_OUT",
+            OrderStatusType.PendingActivation => "PENDING_ACTIVATION",
+            OrderStatusType.Queued => "QUEUED",
+            OrderStatusType.Working => "WORKING",
+            OrderStatusType.Rejected => "REJECTED",
+            OrderStatusType.PendingCancel => "PENDING_CANCEL",
+            OrderStatusType.Canceled => "CANCELED",
+            OrderStatusType.PendingReplace => "PENDING_REPLACE",
+            OrderStatusType.Replaced => "REPLACED",
+            OrderStatusType.Filled => "FILLED",
+            OrderStatusType.Expired => "EXPIRED",
+            _ => throw new ArgumentOutOfRangeException(nameof(orderStatusType), $"Not expected OrderStatusType value: {orderStatusType}")
+        };
 
         public static int ResolutionToFrequency(this Resolution resolution) => resolution switch
         {
@@ -48,54 +193,26 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             _ => throw new ArgumentOutOfRangeException(nameof(resolution), $"Not expected Resolution value: {resolution}")
         };
 
-        public static string GetEnumValue(this Enum value)
-        {
-            // Get the Description attribute value for the enum value
-            var fi = value.GetType().GetField(value.ToString());
-            var attributes = (EnumMemberAttribute[])fi.GetCustomAttributes(typeof(EnumMemberAttribute), false);
-
-            if (attributes.Length > 0)
-            {
-                return attributes[0].Value;
-            }
-            else
-            {
-                return value.ToString();
-            }
-        }
-
-        public static T ToEnum<T>(this string str)
-        {
-            var enumType = typeof(T);
-            foreach (var name in Enum.GetNames(enumType))
-            {
-                var enumMemberAttribute = ((EnumMemberAttribute[])enumType.GetField(name).GetCustomAttributes(typeof(EnumMemberAttribute), true)).Single();
-                if (enumMemberAttribute.Value == str) return (T)Enum.Parse(enumType, name);
-            }
-            //throw exception or whatever handling you want or
-            return default;
-        }
-
         public static Order ConvertOrder(this OrderModel order)
         {
             Order qcOrder;
 
             var symbol = order.OrderLegCollections[0].Instrument.Symbol;// _symbolMapper.GetLeanSymbol(order.Class == TradierOrderClass.Option ? order.OptionSymbol : order.Symbol);
-            var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ToEnum<InstructionType>());
+            var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ConvertStringToInstructionType());
             var time = order.EnteredTime;
 
-            switch (order.OrderType.ToEnum<Models.OrderType>())
+            switch (order.OrderType.ConvertStringToOrderTypeBrokerage())
             {
-                case Models.OrderType.Market:
+                case OrderTypeBrokerage.Market:
                     qcOrder = new MarketOrder(symbol, quantity, time);
                     break;
-                case Models.OrderType.Limit:
+                case OrderTypeBrokerage.Limit:
                     qcOrder = new LimitOrder(symbol, quantity, order.Price, time);
                     break;
-                case Models.OrderType.Stop:
+                case OrderTypeBrokerage.Stop:
                     qcOrder = new StopMarketOrder(symbol, quantity, order.StopPrice, time);
                     break;
-                case Models.OrderType.StopLimit:
+                case OrderTypeBrokerage.StopLimit:
                     qcOrder = new StopLimitOrder(symbol, quantity, order.StopPrice, order.Price, time);
                     break;
                 default:
@@ -155,12 +272,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             }
         }
 
-        public static Models.OrderType ConvertLeanOrderTypeToExchange(this Orders.OrderType orderType) => orderType switch
+        public static OrderTypeBrokerage ConvertLeanOrderTypeToExchange(this Orders.OrderType orderType) => orderType switch
         {
-            Orders.OrderType.Market => Models.OrderType.Market,
-            Orders.OrderType.Limit => Models.OrderType.Limit,
-            Orders.OrderType.StopLimit => Models.OrderType.StopLimit,
-            Orders.OrderType.StopMarket => Models.OrderType.Stop,
+            Orders.OrderType.Market => OrderTypeBrokerage.Market,
+            Orders.OrderType.Limit => OrderTypeBrokerage.Limit,
+            Orders.OrderType.StopLimit => OrderTypeBrokerage.StopLimit,
+            Orders.OrderType.StopMarket => OrderTypeBrokerage.Stop,
             _ => throw new ArgumentException($"TDAmeritrade doesn't support of OrderType {nameof(orderType)}")
         };
 

@@ -35,7 +35,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
 
         public PlaceOrderLegCollectionModel(InstructionType instructionType, decimal quantity, InstrumentPlaceOrderModel instrument)
         {
-            InstructionType = instructionType.GetEnumMemberValue();
+            InstructionType = instructionType.ConvertInstructionTypeToString();
             Quantity = quantity;
             Instrument = instrument;
         }

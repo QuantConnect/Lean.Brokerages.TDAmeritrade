@@ -41,7 +41,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             { typeof(OrderCancelRequestMessage), new XmlSerializer(typeof(OrderCancelRequestMessage))},
             { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
-            { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))}
+            { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))},
+            { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))}
         };
 
         /// <summary>
@@ -567,6 +568,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
                     HandleOrderCancelRequest(candelOrder);
                     break;
+                case "OrderCancelReplaceRequest":
+                    var cancelReplaceOrder = DeserializeXMLExecutionResponse<OrderCancelReplaceRequestMessage>(accountActivityData.Value.MessageData);
+                    break;
                 case "OrderEntryRequest": // A new order has been submitted
                     var newOrder = DeserializeXMLExecutionResponse<OrderEntryRequestMessage>(accountActivityData.Value.MessageData);
                     HandleSubmitNewOrder(newOrder);
@@ -658,7 +662,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class
         {
-            XmlSerializer serializer = _serializers[typeof(T)];
+            var serializer = _serializers[typeof(T)];
 
             using (var reader = new StringReader(xml))
             {

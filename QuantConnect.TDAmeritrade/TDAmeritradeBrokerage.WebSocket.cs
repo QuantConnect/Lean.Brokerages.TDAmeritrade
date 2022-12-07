@@ -568,7 +568,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
                     HandleOrderCancelRequest(candelOrder);
                     break;
-                case "OrderCancelReplaceRequest":
+                case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received
                     var cancelReplaceOrder = DeserializeXMLExecutionResponse<OrderCancelReplaceRequestMessage>(accountActivityData.Value.MessageData);
                     break;
                 case "OrderEntryRequest": // A new order has been submitted

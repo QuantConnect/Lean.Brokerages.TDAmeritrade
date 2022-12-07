@@ -216,11 +216,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             foreach (var id in order.BrokerId)
             {
-                var res = CancelOrder(id);
+                var isCancelSuccess = CancelOrder(id);
 
-                if (res)
+                if (isCancelSuccess)
                 {
-                    success.Add(res);
+                    success.Add(isCancelSuccess);
                     OnOrderEvent(new OrderEvent(order,
                         DateTime.UtcNow,
                         OrderFee.Zero,

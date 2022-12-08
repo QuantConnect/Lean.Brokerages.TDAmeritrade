@@ -524,7 +524,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 DefaultOrderBook symbolOrderBook;
                 if (!_subscribedTickers.TryGetValue(symbolLean, out symbolOrderBook))
                 {
-                    continue;
+                    symbolOrderBook = new DefaultOrderBook(symbolLean);
+                    _subscribedTickers[symbolLean] = symbolOrderBook;
+                }
+                else
+                {
+                    symbolOrderBook.BestBidAskUpdated -= OnBestBidAskUpdated;
+                    symbolOrderBook.Clear();
                 }
 
                 if (symbol.BidPrice > 0)
@@ -537,6 +543,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     symbolOrderBook.UpdateAskRow(symbol.AskPrice, symbol.AskSize);
                 }
 
+                symbolOrderBook.BestBidAskUpdated += OnBestBidAskUpdated;
+
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
                     var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
@@ -545,6 +553,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     _aggregator.Update(trade);
                 }
             }
+        }
+
+        private void OnBestBidAskUpdated(object? sender, BestBidAskUpdatedEventArgs e)
+        {
+            _aggregator.Update(new Tick
+            {
+                AskPrice = e.BestAskPrice,
+                BidPrice = e.BestBidPrice,
+                Time = DateTime.UtcNow,
+                Symbol = e.Symbol,
+                TickType = TickType.Quote,
+                AskSize = e.BestAskSize,
+                BidSize = e.BestBidSize
+            });
         }
 
         private void ParseAccountActivity(JToken content)

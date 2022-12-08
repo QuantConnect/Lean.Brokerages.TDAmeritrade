@@ -65,6 +65,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             if (WebSocket != null && WebSocket.IsOpen)
             {
                 LogOut();
+                WebSocket.Close();
             }
         }
 
@@ -221,11 +222,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 };
 
                 WebSocket.Send(JsonConvert.SerializeObject(request));
-
-                // After login, we need to subscribe to account's Trade activity chanel
-                SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
             }
-
         }
 
         public void LogOut()
@@ -463,6 +460,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleResponseData, Login: {token["content"]["msg"]}");
                     }
+                    else
+                    {
+                        // After login, we need to subscribe to account's Trade activity chanel
+                        var userPrincipals = GetUserPrincipals();
+                        SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
+                    }
                     break;
                 case "LOGOUT":
                     Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleResponseData, Logout: {token["content"]["msg"]}");
@@ -486,10 +489,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "heartbeat":
                     break;
                 case "service":
-                    if (token["content"]["code"].Value<int>() == 30)
-                    {
-                        Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleNotify: {token["content"]["msg"]}");
-                    }
+                    HandleNotifyServiceResponse(token["content"]);
                     break;
             }
         }
@@ -740,6 +740,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _onOrderWebSocketResponseEvent.Set();
         }
 
+        private void HandleNotifyServiceResponse(JToken content)
+        {
+            switch (content["code"].Value<int>())
+            {
+                case 30:
+                    Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleNotify: {content["msg"]}");
+                    break;
+                case 12:
+                    Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:Error:HandleNotify: {content["msg"]}");
+                    break;
+            }
+        }
+
         private T? DeserializeXMLExecutionResponse<T>(string xml) where T : class
         {
             var serializer = _serializers[typeof(T)];
@@ -772,7 +785,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _ => "unknown"
         };
 
-        private OrderModel? TryGetCashedOrder(string orderKey) 
+        private OrderModel? TryGetCashedOrder(string orderKey)
             => _cachedOrdersFromWebSocket.TryGetValue(orderKey, out OrderModel orderModel) ? orderModel : null;
     }
 }

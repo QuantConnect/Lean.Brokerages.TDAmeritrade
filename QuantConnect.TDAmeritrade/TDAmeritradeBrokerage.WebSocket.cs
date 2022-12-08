@@ -45,6 +45,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))}
         };
 
+        private object _tickLocker = new object();
+
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
@@ -547,17 +549,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
-                    var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
+                    var quoteTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
                     var exchange = ConvertIDExchangeToFullName(symbol.ExchangeID);
-                    var trade = new Tick(tradeTime, symbolLean, "", exchange, symbol.LastSize, symbol.LastPrice);
-                    _aggregator.Update(trade);
+                    var quote = new Tick(quoteTime, symbolLean, "", exchange, symbol.LastSize, symbol.LastPrice)
+                    {
+                        TickType = TickType.Quote
+                    };
+                    _aggregator.Update(quote);
                 }
             }
         }
 
         private void OnBestBidAskUpdated(object? sender, BestBidAskUpdatedEventArgs e)
         {
-            _aggregator.Update(new Tick
+            var tick = new Tick
             {
                 AskPrice = e.BestAskPrice,
                 BidPrice = e.BestBidPrice,
@@ -566,7 +571,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 TickType = TickType.Quote,
                 AskSize = e.BestAskSize,
                 BidSize = e.BestBidSize
-            });
+            };
+
+            tick.SetValue();
+
+            lock (_tickLocker)
+            {
+                _aggregator.Update(tick);
+            }
         }
 
         private void ParseAccountActivity(JToken content)

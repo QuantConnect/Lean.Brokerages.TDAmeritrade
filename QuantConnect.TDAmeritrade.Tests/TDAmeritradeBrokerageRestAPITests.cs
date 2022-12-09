@@ -29,7 +29,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             {
                 if (string.IsNullOrEmpty(Config.Get(item)))
                 {
-                    throw new ArgumentException($"KrakenBrokerageFactory.CreateBrokerage: Missing {item} in config.json");
+                    throw new ArgumentException($"TDAmeritradeBrokerageFactory.CreateBrokerage: Missing {item} in config.json");
                 }
             }
 

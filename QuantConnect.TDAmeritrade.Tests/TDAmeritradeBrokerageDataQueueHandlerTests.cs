@@ -57,8 +57,32 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             {
                 ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
                     cancelationToken,
-                    (baseData) => {
-                        if (baseData != null) { Log.Trace($"{baseData}"); }
+                    (tick) =>
+                    {
+                        if(tick is Tick)
+                        {
+                            Log.Trace($"Tick: {tick}");
+                            Assert.NotZero(tick.Price);
+                            Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
+                            Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
+                            Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
+                        }
+                        if (tick is TradeBar)
+                        { 
+                            Log.Trace($"TradeBar: {tick}");
+                            Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
+                            Assert.IsTrue(tick.DataType == MarketDataType.TradeBar);
+                            Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
+                            Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
+                        }
+                        if (tick is QuoteBar)
+                        {
+                            Log.Trace($"QuoteBar: {tick}");
+                            Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
+                            Assert.IsTrue(tick.DataType == MarketDataType.QuoteBar);
+                            Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
+                            Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
+                        }
                     });
             }
 

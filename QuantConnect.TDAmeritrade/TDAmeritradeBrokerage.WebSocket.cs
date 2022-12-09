@@ -19,7 +19,6 @@ using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Logging;
-using QuantConnect.Orders;
 using QuantConnect.Packets;
 using System.Collections.Concurrent;
 using System.Web;
@@ -30,7 +29,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     public partial class TDAmeritradeBrokerage
     {
         private int _counter;
-        private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _subscribedTickers = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
+        private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _orderBooks = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
 
         /// <summary>
         /// We're caching orders to increase speed of getting info about ones
@@ -71,26 +70,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         protected override bool Subscribe(IEnumerable<Symbol> symbols)
         {
-            var symbolsAdded = false;
+            var pendingSymbols = new List<string>();
 
             foreach (var symbol in symbols)
             {
-                if (!symbol.Value.Contains("universe", StringComparison.InvariantCultureIgnoreCase))
+                if (!_orderBooks.ContainsKey(symbol))
                 {
-                    if (!_subscribedTickers.ContainsKey(symbol))
-                    {
-                        _subscribedTickers.TryAdd(symbol, new DefaultOrderBook(symbol));
-                        symbolsAdded = true;
-                        _symbolMapper.GetWebsocketSymbol(symbol);
-                    }
+                    _orderBooks[symbol] = CreateOrderBookWithEventBestBidAskUpdate(symbol, OnBestBidAskUpdated);
+                    var brokerageSymbol = _symbolMapper.GetBrokerageWebsocketSymbol(symbol);
+                    pendingSymbols.Add(brokerageSymbol);
                 }
             }
 
-            if (symbolsAdded)
+            if (pendingSymbols.Any())
             {
-                var subscribeSymbolArray = _subscribedTickers.Keys.Select(x => x.Value).ToArray();
-                SubscribeToLevelOne(subscribeSymbolArray);
-                SubscribetToChart(subscribeSymbolArray);
+                SubscribeToLevelOne(pendingSymbols.ToArray());
             }
 
             return true;
@@ -106,26 +100,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private bool Unsubscribe(IEnumerable<Symbol> symbols)
         {
-            var symbolsRemoved = false;
-            var removedSymbols = new List<string>();
+            var unsubscribeSymbols = new List<string>();
             foreach (var symbol in symbols)
             {
-                if (!symbol.IsCanonical())
+                if (_orderBooks.ContainsKey(symbol))
                 {
-                    if (_subscribedTickers.ContainsKey(symbol))
-                    {
-                        _subscribedTickers.TryRemove(symbol, out var removedSymbol);
-                        removedSymbols.Add(symbol.Value);
-                        symbolsRemoved = true;
-                    }
+                    _orderBooks.TryRemove(symbol, out var removedSymbol);
+                    unsubscribeSymbols.Add(_symbolMapper.GetBrokerageWebsocketSymbol(symbol));
                 }
             }
 
-            if (symbolsRemoved)
+            if (unsubscribeSymbols.Any())
             {
-                var removeSymbolArray = removedSymbols.ToArray();
-                UnSubscribeToLevelOne(removeSymbolArray);
-                UnSubscribeToChart(removeSymbolArray);
+                UnSubscribeToLevelOne(unsubscribeSymbols.ToArray());
             }
 
             return true;
@@ -290,55 +277,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
-        /// Chart provides  streaming one minute OHLCV (Open/High/Low/Close/Volume) for a one minute period.
-        /// </summary>
-        /// <remarks>
-        /// The one minute bar falls on the 0 second slot (ie. 9:30:00) and includes data from 0 second to 59 seconds.
-        /// </remarks>
-        /// <example>
-        /// For example, a 9:30 bar includes data from 9:30:00 through 9:30:59.
-        /// </example>
-        /// <param name="symbols"></param>
-        private void SubscribetToChart(params string[] symbols)
-        {
-            var userPrincipals = GetUserPrincipals();
-
-            var request = new StreamRequestModelContainer
-            {
-                Requests = new StreamRequestModel[]
-                {
-                    new StreamRequestModel
-                    {
-                        Service = "CHART_EQUITY",
-                        Command = "SUBS",
-                        Requestid = Interlocked.Increment(ref _counter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
-                        Parameters = new
-                        {
-                            keys = $"{string.Join(",", symbols)}",
-                            fields = "0,1,2,3,4,5,6,7,8"
-                            #region Description Fields
-                            /* 0 - Ticker symbol in upper case.
-                             * 1 - Open Price, Opening price for the minute
-                             * 2 - High Price, Highest price for the minute
-                             * 3 - Low Price, Chart’s lowest price for the minute
-                             * 4 - Close Price, Closing price for the minute
-                             * 5 - Volume, Total volume for the minute
-                             * 6 - Sequence, Identifies the candle minute
-                             * 7 - Chart Time, Milliseconds since Epoch
-                             * 8 - Chart Day, Not useful
-                             */
-                            #endregion
-                        }
-                    }
-                }
-            };
-
-            WebSocket.Send(JsonConvert.SerializeObject(request));
-        }
-
-        /// <summary>
         /// This service is used to request streaming updates for one or more accounts associated with the logged in User ID.  
         /// Common usage would involve issuing the OrderStatus API request to get all transactions for an account, and subscribing to 
         /// ACCT_ACTIVITY to get any updates. 
@@ -401,32 +339,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             WebSocket.Send(JsonConvert.SerializeObject(request));
         }
 
-        private void UnSubscribeToChart(params string[] symbols)
-        {
-            var userPrincipals = GetUserPrincipals();
-
-            var request = new StreamRequestModelContainer
-            {
-                Requests = new StreamRequestModel[]
-                {
-                    new StreamRequestModel
-                    {
-                        Service = "CHART_EQUITY",
-                        Command = "UNSUBS",
-                        Requestid = Interlocked.Increment(ref _counter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
-                        Parameters = new
-                        {
-                            keys = $"{string.Join(",", symbols)}"
-                        }
-                    }
-                }
-            };
-
-            WebSocket.Send(JsonConvert.SerializeObject(request));
-        }
-
         /// <summary>
         /// Handle Streaming market data
         /// </summary>
@@ -438,8 +350,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "QUOTE":
                     ParseQuoteLevelOneData(token["content"]);
                     break;
-                case "CHART_EQUITY":
-                    ParseChartEquityData(token["content"]);
                     break;
                 case "ACCT_ACTIVITY":
                     ParseAccountActivity(token["content"]);
@@ -494,91 +404,87 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
-        private void ParseChartEquityData(JToken content)
-        {
-            var charts = content.ToObject<List<ChartEquityModel>>() ?? new List<ChartEquityModel>(0);
-
-            foreach (var chart in charts)
-            {
-                var symbolLean = _symbolMapper.GetSymbolFromWebsocket(chart.Symbol);
-
-                _aggregator.Update(new TradeBar
-                {
-                    Symbol = symbolLean,
-                    Open = chart.OpenPrice,
-                    Close = chart.ClosePrice,
-                    High = chart.HighPrice,
-                    Low = chart.LowPrice,
-                    Volume = chart.Volume,
-                    Period = TimeSpan.FromMinutes(1),
-                    Time = Time.UnixMillisecondTimeStampToDateTime(chart.ChartTime)
-                });
-            }
-        }
-
         private void ParseQuoteLevelOneData(JToken content)
         {
             var levelOneData = content.ToObject<List<LevelOneResponseModel>>() ?? new List<LevelOneResponseModel>(0);
             foreach (var symbol in levelOneData)
             {
-                var symbolLean = _symbolMapper.GetSymbolFromWebsocket(symbol.Symbol);
+                var symbolLean = _symbolMapper.GetLeanSymbolByBrokerageWebsocketSymbol(symbol.Symbol);
 
                 DefaultOrderBook symbolOrderBook;
-                if (!_subscribedTickers.TryGetValue(symbolLean, out symbolOrderBook))
+                // After Unsubscribe, we haven't gotten response already, but update will come in this chanel.
+                if (!_orderBooks.TryGetValue(symbolLean, out symbolOrderBook))
                 {
-                    symbolOrderBook = new DefaultOrderBook(symbolLean);
-                    _subscribedTickers[symbolLean] = symbolOrderBook;
-                }
-                else
-                {
-                    symbolOrderBook.BestBidAskUpdated -= OnBestBidAskUpdated;
-                    symbolOrderBook.Clear();
+                    return;
                 }
 
-                if (symbol.BidPrice > 0)
+                if (symbol.BidSize == 0)
+                {
+                    symbolOrderBook.RemoveBidRow(symbol.BidPrice);
+                }
+                else
                 {
                     symbolOrderBook.UpdateBidRow(symbol.BidPrice, symbol.BidSize);
                 }
 
-                if (symbol.AskPrice > 0)
+                if (symbol.AskSize == 0)
+                {
+                    symbolOrderBook.RemoveAskRow(symbol.AskPrice);
+                }
+                else
                 {
                     symbolOrderBook.UpdateAskRow(symbol.AskPrice, symbol.AskSize);
                 }
 
-                symbolOrderBook.BestBidAskUpdated += OnBestBidAskUpdated;
-
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
-                    var quoteTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
-                    var exchange = ConvertIDExchangeToFullName(symbol.ExchangeID);
-                    var quote = new Tick(quoteTime, symbolLean, "", exchange, symbol.LastSize, symbol.LastPrice)
-                    {
-                        TickType = TickType.Quote
-                    };
-                    _aggregator.Update(quote);
+                    var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
+                    EmitTradeTick(symbolLean, symbol.LastPrice, symbol.LastSize, tradeTime);
                 }
             }
         }
 
         private void OnBestBidAskUpdated(object? sender, BestBidAskUpdatedEventArgs e)
         {
-            var tick = new Tick
+            EmitQuoteTick(e.Symbol, e.BestBidPrice, e.BestBidSize, e.BestAskPrice, e.BestAskSize);
+        }
+
+        /// <summary>
+        /// Emits a new quote tick
+        /// </summary>
+        /// <param name="symbol">The symbol</param>
+        /// <param name="bidPrice">The bid price</param>
+        /// <param name="bidSize">The bid size</param>
+        /// <param name="askPrice">The ask price</param>
+        /// <param name="askSize">The ask price</param>
+        private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
+        {
+            _aggregator.Update(new Tick
             {
-                AskPrice = e.BestAskPrice,
-                BidPrice = e.BestBidPrice,
+                AskPrice = askPrice,
+                BidPrice = bidPrice,
+                Value = (askPrice + bidPrice) / 2m,
                 Time = DateTime.UtcNow,
-                Symbol = e.Symbol,
+                Symbol = symbol,
                 TickType = TickType.Quote,
-                AskSize = e.BestAskSize,
-                BidSize = e.BestBidSize
-            };
+                AskSize = askSize,
+                BidSize = bidSize
+            });
+        }
 
-            tick.SetValue();
-
-            lock (_tickLocker)
+        /// <summary>
+        /// Emits a new trade tick from a match message
+        /// </summary>
+        private void EmitTradeTick(Symbol symbol, decimal price, decimal size, DateTime tradeTime)
+        {
+            _aggregator.Update(new Tick
             {
-                _aggregator.Update(tick);
-            }
+                Value = price,
+                Time = tradeTime,
+                Symbol = symbol,
+                TickType = TickType.Trade,
+                Quantity = size
+            });
         }
 
         private void ParseAccountActivity(JToken content)
@@ -593,7 +499,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             switch (accountActivityData.Value.MessageType)
             {
                 case "SUBSCRIBED":
-                    Log.Trace($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivityData.Value.MessageData}");
+                    Log.Debug($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivityData.Value.MessageData}");
                     break;
                 case "ERROR":
                     Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
@@ -668,7 +574,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var brokerageOrderKey = orderFillResponse.Order.OrderKey.ToStringInvariant();
             OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
 
-            if(cashedOrder == null)
+            if (cashedOrder == null)
             {
                 Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
                 return;
@@ -787,5 +693,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private OrderModel? TryGetCashedOrder(string orderKey)
             => _cachedOrdersFromWebSocket.TryGetValue(orderKey, out OrderModel orderModel) ? orderModel : null;
+
+        private DefaultOrderBook CreateOrderBookWithEventBestBidAskUpdate(Symbol symbol, EventHandler<BestBidAskUpdatedEventArgs> updateEvent)
+        {
+            var orderBook = new DefaultOrderBook(symbol);
+            orderBook.BestBidAskUpdated += updateEvent;
+            return orderBook;
+        }
     }
 }

@@ -59,26 +59,26 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="symbol">Lean <see cref="Symbol"/></param>
         /// <returns>Websocket symbol</returns>
         /// <exception cref="ArgumentException">Wrong Lean <see cref="Symbol"/></exception>
-        public string GetWebsocketSymbol(Symbol symbol)
+        public string GetBrokerageWebsocketSymbol(Symbol symbol)
         {
             _wsSymbolMap.TryAdd(symbol.Value, symbol);
 
-            return symbol.Value;
+            return symbol.ID.Symbol;
         }
 
         /// <summary>
         /// Get Lean <see cref="Symbol"/> from TD Ameritrade Websocket</summary>
-        /// <param name="wsSymbol"></param>
-        /// <returns>Lean <see cref="Symbol"/></returns>
-        public Symbol GetSymbolFromWebsocket(string wsSymbol)
+        /// <param name="brokerageWebSocketSymbol">brokerage symbol</param>
+        /// <returns>Lean <see cref="Symbol"/>Lean symbol</returns>
+        public Symbol GetLeanSymbolByBrokerageWebsocketSymbol(string brokerageWebSocketSymbol)
         {
             Symbol? leanSymbol;
-            if (_wsSymbolMap.TryGetValue(wsSymbol, out leanSymbol))
+            if (_wsSymbolMap.TryGetValue(brokerageWebSocketSymbol, out leanSymbol))
             {
                 return leanSymbol;
             }
 
-            throw new ArgumentException($"TDAmeritrade:SymbolMapper:GetSymbolFromWebsocket(), symbol hasn't kept in collection: {wsSymbol}");
+            throw new ArgumentException($"TDAmeritrade:SymbolMapper:GetSymbolFromWebsocket(), symbol hasn't kept in collection: {brokerageWebSocketSymbol}");
         }
 
         private string GetMappedTicker(Symbol symbol)

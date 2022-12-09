@@ -34,6 +34,9 @@ using System.Text;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
+    /// <summary>
+    /// TD Ameritrade Brokerage implementation
+    /// </summary>
     [BrokerageFactory(typeof(TDAmeritradeBrokerage))]
     public partial class TDAmeritradeBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {

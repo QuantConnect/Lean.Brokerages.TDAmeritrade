@@ -23,6 +23,9 @@ using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages.TDAmeritrade
 {
+    /// <summary>
+    /// Factory type for the <see cref="TDAmeritradeBrokerage"/>
+    /// </summary>
     public class TDAmeritradeBrokerageFactory : BrokerageFactory
     {
         public override Dictionary<string, string> BrokerageData

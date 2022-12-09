@@ -5,10 +5,10 @@
 		<TargetFramework>net6.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<Product>QuantConnect.TradierBrokerage</Product>
-		<AssemblyName>QuantConnect.TradierBrokerage</AssemblyName>
-		<RootNamespace>QuantConnect.TradierBrokerage</RootNamespace>
-		<AssemblyTitle>QuantConnect.TradierBrokerage</AssemblyTitle>
+		<Product>QuantConnect.TDAmeritradeBrokerage</Product>
+		<AssemblyName>QuantConnect.TDAmeritradeBrokerage</AssemblyName>
+		<RootNamespace>QuantConnect.TDAmeritradeBrokerage</RootNamespace>
+		<AssemblyTitle>QuantConnect.TDAmeritradeBrokerage</AssemblyTitle>
 		<OutputType>Library</OutputType>
 		<OutputPath>bin\$(Configuration)\</OutputPath>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

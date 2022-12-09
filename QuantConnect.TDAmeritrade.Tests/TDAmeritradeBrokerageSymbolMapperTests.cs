@@ -19,14 +19,27 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
     public class TDAmeritradeBrokerageSymbolMapperTests
     {
         [TestCase("AAPL", "AAPL")]
-        [TestCase("VXXB", "VXXB")]
-        public void MapCorrectBrokerageSymbol(string ticker, string wexSymbol)
+        [TestCase("VXXB", "VXX")]
+        [TestCase("BAC", "BAC")]
+        [TestCase("SPWRA", "SPWR")]
+        [TestCase("NB", "BAC")]
+        [TestCase("GOOCV", "GOOG")]
+        [TestCase("FB", "FB")]
+        [TestCase("GOOAV", "GOOAV")]
+        [TestCase("QQQQ", "QQQ")]
+        [TestCase("TFCFA", "TFCFA")]
+        [TestCase("TAPA", "TAP.A")]
+        //[TestCase("TWX", "TWX")] // - Time Warner Inc TWX
+        //[TestCase("AOL", "AOL")]
+        [TestCase("UW", "WM")]
+        [TestCase("WMI", "WMI")]
+        public void MapCorrectBrokerageSymbol(string ticker, string tdAmeritradeSymbol)
         {
             var mapper = new TDAmeritradeSymbolMapper(TestGlobals.MapFileProvider);
 
             var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
             var brokerageSymbol = mapper.GetBrokerageSymbol(symbol);
-            Assert.That(brokerageSymbol, Is.EqualTo(wexSymbol));
+            Assert.That(brokerageSymbol, Is.EqualTo(tdAmeritradeSymbol));
         }
 
         [TestCase("NVAX", SecurityType.Equity, "NVAX")]

@@ -14,6 +14,7 @@
 */
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Brokerages.TDAmeritrade.Utils;
 using QuantConnect.Logging;
@@ -119,7 +120,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddQueryParameter("apikey", _consumerKey);
 
-            return Execute<QuoteTDAmeritradeModel>(request, symbol);
+            var quoteJObject = Execute<JObject>(request);
+
+            return quoteJObject.ContainsKey(symbol) ?
+                JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(quoteJObject[symbol]!.ToString()) : new QuoteTDAmeritradeModel();
         }
 
         /// <summary>
@@ -135,19 +139,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddQueryParameter("symbol", symbolsInOneLine);
 
-            var jsonResponse = Execute<string>(request);
+            var jsonResponse = Execute<JObject>(request);
 
-            var qutes = new List<QuoteTDAmeritradeModel>(symbols.Length);
+            var quotes = new List<QuoteTDAmeritradeModel>(symbols.Length);
 
             foreach (var symbol in symbols)
             {
-                if (TryDeserializeRemoveRoot(jsonResponse, symbol, out QuoteTDAmeritradeModel result))
-                {
-                    qutes.Add(result);
+                if(jsonResponse.ContainsKey(symbol))
+                { 
+                    quotes.Add(JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(jsonResponse[symbol]!.ToString()));
                 }
             }
 
-            return qutes;
+            return quotes;
         }
 
         /// <summary>
@@ -322,28 +326,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         #endregion
 
         #region TDAmeritrade Helpers
-
-        private bool TryDeserializeRemoveRoot<T>(string json, string rootName, out T obj)
-        {
-            obj = default;
-            var success = false;
-
-            try
-            {
-                //Dynamic deserialization:
-                dynamic dynDeserialized = JsonConvert.DeserializeObject(json);
-                obj = JsonConvert.DeserializeObject<T>(dynDeserialized[rootName].ToString());
-
-                // if we arrieved here without exploding it's a success even if obj is null, because that's what we got back
-                success = true;
-            }
-            catch (Exception err)
-            {
-                Log.Error(err, "RootName: " + rootName);
-            }
-
-            return success;
-        }
 
         /// <summary>
         /// Valid periods by periodType (defaults marked with an asterisk)

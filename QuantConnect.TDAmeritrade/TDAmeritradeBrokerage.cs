@@ -88,7 +88,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region TD Ameritrade client
 
-        private T Execute<T>(RestRequest request, string rootName = "")
+        private T Execute<T>(RestRequest request)
         {
             var response = default(T);
 
@@ -99,7 +99,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
                     PostAccessToken(GrantType.RefreshToken, string.Empty);
-                    Execute<T>(request, rootName);
+                    Execute<T>(request);
                 }
                 else if (request.Resource == "oauth2/token")
                 {
@@ -116,22 +116,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             try
             {
+                // api sometimes returns message in response 
                 if (typeof(T) == typeof(String))
                 {
                     return (T)(object)untypedResponse.Content;
                 }
 
-                if (!string.IsNullOrEmpty(rootName))
-                {
-                    if (TryDeserializeRemoveRoot(untypedResponse.Content, rootName, out response))
-                    {
-                        return response;
-                    }
-                }
-                else
-                {
-                    return JsonConvert.DeserializeObject<T>(untypedResponse.Content);
-                }
+                return JsonConvert.DeserializeObject<T>(untypedResponse.Content);
             }
             catch (Exception e)
             {
@@ -204,7 +195,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         FillPrice = cashedOrder.Price,
                         FillQuantity = cashedOrder.Quantity
                     });
-                    
+
                     return true;
                 }
             }
@@ -239,7 +230,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
                 {
-                    isCancelSuccess = GetOrderByNumber(id).Status == OrderStatusType.Canceled;              
+                    isCancelSuccess = GetOrderByNumber(id).Status == OrderStatusType.Canceled;
                 }
                 else
                 {

@@ -51,5 +51,13 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.That(url, Is.Not.Empty);
             Assert.That(url, Does.Contain(_apiKey));
         }
+
+        [TestCase(true, "LODE", "AAPL", "IBM")]
+        [TestCase(false, "LODEE", "AAPLA", "IBMA")]
+        public void GetAsk(bool expected, params string[] symbols)
+        {
+            var quotes = _brokerage.GetQuotes(symbols);
+            Assert.That(quotes.Count() == symbols.Length, Is.EqualTo(expected));
+        }
     }
 }

@@ -29,7 +29,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                 {
                     new TestCaseData(Symbols.AAPL, Resolution.Tick, false),
                     new TestCaseData(Symbols.AAPL, Resolution.Minute, false),
-                    new TestCaseData(Symbols.AAPL, Resolution.Second, false),
+                    new TestCaseData(Symbols.AAPL, Resolution.Second, false)
                 };
             }
         }
@@ -53,6 +53,8 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                     GetSubscriptionDataConfig<TradeBar>(symbol, resolution) };
             }
 
+            var dataReceivedForType = new Dictionary<Type, int>() { { typeof(Tick), 0}, { typeof(TradeBar), 0}, { typeof(QuoteBar), 0} };
+
             foreach (var config in configs)
             {
                 ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
@@ -61,27 +63,38 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                     {
                         if(tick is Tick)
                         {
-                            Log.Trace($"Tick: {tick}");
+                            Log.Debug($"Tick: {tick}");
                             Assert.NotZero(tick.Price);
                             Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
                             Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
                             Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
+
+                            dataReceivedForType[typeof(Tick)] += 1;
                         }
-                        if (tick is TradeBar)
+                        if (tick is TradeBar tradeBar)
                         { 
-                            Log.Trace($"TradeBar: {tick}");
+                            Log.Debug($"TradeBar: {tick}");
                             Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
                             Assert.IsTrue(tick.DataType == MarketDataType.TradeBar);
                             Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
                             Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
+
+                            Assert.AreEqual(tradeBar.Period, config.Resolution.ToTimeSpan(), "Resolution was not equal period");
+
+                            dataReceivedForType[typeof(TradeBar)] += 1;
                         }
-                        if (tick is QuoteBar)
+                        if (tick is QuoteBar quoteBar)
                         {
-                            Log.Trace($"QuoteBar: {tick}");
+                            Log.Debug($"QuoteBar: {tick}");
                             Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
                             Assert.IsTrue(tick.DataType == MarketDataType.QuoteBar);
                             Assert.IsTrue(tick.Price > 0, "Price was not greater then zero");
                             Assert.IsTrue(tick.Value > 0, "Value was not greater then zero");
+
+                            Assert.AreEqual(quoteBar.Period, config.Resolution.ToTimeSpan(), "QuoteBar was not equal period");
+
+
+                            dataReceivedForType[typeof(QuoteBar)] += 1;
                         }
                     });
             }
@@ -93,7 +106,19 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                 brokerage.Unsubscribe(config);
             }
 
-            Thread.Sleep(20000);
+            Thread.Sleep(10000);
+
+            foreach (var dataType in dataReceivedForType.Keys)
+            {
+                if (configs.Any(i => i.Type == dataType))
+                {
+                    Assert.Greater(dataReceivedForType[dataType], 0);
+                }
+                else
+                {
+                    Assert.AreEqual(dataReceivedForType[dataType], 0);
+                }
+            }
 
             cancelationToken.Cancel();
         }

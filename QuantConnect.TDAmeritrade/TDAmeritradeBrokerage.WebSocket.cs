@@ -16,10 +16,13 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
+using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
+using QuantConnect.Util;
 using System.Collections.Concurrent;
 using System.Web;
 using System.Xml.Serialization;
@@ -28,14 +31,24 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 {
     public partial class TDAmeritradeBrokerage
     {
-        private int _counter;
+        /// <summary>
+        /// Keep value to next subscribe event on websocket channel
+        /// </summary>
+        private int _requestIdCounter;
+
+        /// <summary>
+        /// Keep and handle actual order book websocket response
+        /// </summary>
         private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _orderBooks = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
 
         /// <summary>
         /// We're caching orders to increase speed of getting info about ones
         /// </summary>
-        private Dictionary<string, OrderModel> _cachedOrdersFromWebSocket = new Dictionary<string, OrderModel>();
+        private ConcurrentDictionary<string, OrderModel> _cachedOrdersFromWebSocket = new ConcurrentDictionary<string, OrderModel>();
 
+        /// <summary>
+        /// XML serializers instance to parse xml from websocket
+        /// </summary>
         private Dictionary<Type, XmlSerializer> _serializers = new Dictionary<Type, XmlSerializer>()
         {
             { typeof(OrderCancelRequestMessage), new XmlSerializer(typeof(OrderCancelRequestMessage))},
@@ -44,15 +57,28 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))}
         };
 
-        private object _tickLocker = new object();
-
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
         public override bool IsConnected => WebSocket.IsOpen;
 
+        /// <summary>
+        /// Sets the job we're subscribing for
+        /// </summary>
+        /// <param name="job">Job we're subscribing for</param>
         public void SetJob(LiveNodePacket job)
         {
+            var consumerKey = job.BrokerageData["tdameritrade-account-number"];
+            var accessToken = job.BrokerageData["tdameritrade-account-number"];
+            var accountNumber = job.BrokerageData["tdameritrade-account-number"];
+
+            Initialize(
+                consumerKey,
+                accessToken,
+                accountNumber,
+                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider"))
+                );
+
             if (!IsConnected)
             {
                 Connect();
@@ -195,7 +221,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "ADMIN",
                         Command = "LOGIN",
-                        Requestid = Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _requestIdCounter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
@@ -224,7 +250,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "ADMIN",
                         Command = "LOGOUT",
-                        Requestid = Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _requestIdCounter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new { }
@@ -246,7 +272,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "QUOTE",
                         Command = "SUBS",
-                        Requestid = Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _requestIdCounter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
@@ -291,7 +317,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "ACCT_ACTIVITY",
                         Command = "SUBS",
-                        Requestid = Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _requestIdCounter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
@@ -325,7 +351,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     {
                         Service = "QUOTE",
                         Command = "UNSUBS",
-                        Requestid = Interlocked.Increment(ref _counter),
+                        Requestid = Interlocked.Increment(ref _requestIdCounter),
                         Account = userPrincipals.Accounts[0].AccountId,
                         Source = userPrincipals.StreamerInfo.AppId,
                         Parameters = new
@@ -640,7 +666,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             // add new order to cache collection
             _cachedOrdersFromWebSocket[newBrokerageOrderKey.ToStringInvariant()] = cashedOrder;
             // remove order from cache collection
-            _cachedOrdersFromWebSocket.Remove(oldBrokerageOrderKey);
+            OrderModel removedOrderModel;
+            _cachedOrdersFromWebSocket.TryRemove(oldBrokerageOrderKey, out removedOrderModel);
 
             // Reset Event for UpdateOrder mthd()
             _onOrderWebSocketResponseEvent.Set();

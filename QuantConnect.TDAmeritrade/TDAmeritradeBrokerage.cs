@@ -40,9 +40,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     [BrokerageFactory(typeof(TDAmeritradeBrokerage))]
     public partial class TDAmeritradeBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {
-        private readonly string _consumerKey;
-        private readonly string _accessToken;
-        private readonly string _accountNumber;
+        private string _consumerKey;
+        private string _accessToken;
+        private string _accountNumber;
         private string _refreshToken;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
@@ -56,7 +56,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly IDataAggregator _aggregator;
         private readonly IOrderProvider _orderProvider;
 
-        private readonly TDAmeritradeSymbolMapper _symbolMapper;
+        private TDAmeritradeSymbolMapper _symbolMapper;
 
         /// <summary>
         /// Thread synchronization event, for successful Place Order
@@ -75,15 +75,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             IOrderProvider orderProvider,
             IMapFileProvider mapFileProvider) : base("TD Ameritrade")
         {
-            _consumerKey = consumerKey;
-            _accessToken = accessToken;
-            _accountNumber = accountNumber;
             _algorithm = algorithm;
             _aggregator = aggregator;
             _orderProvider = orderProvider;
-            _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);
 
-            Initialize();
+            Initialize(consumerKey, accessToken, accountNumber, mapFileProvider);
         }
 
         #region TD Ameritrade client
@@ -134,7 +130,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override bool PlaceOrder(Order order)
         {
-
             var placeOrderResponse = PostPlaceOrder(order);
 
             if (!string.IsNullOrEmpty(placeOrderResponse))
@@ -182,24 +177,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var replaceOrderResponse = ReplaceOrder(order);
 
-            // check if the updated (marketable) order was filled
-            if (!string.IsNullOrEmpty(replaceOrderResponse))
-            {
-                OrderModel cashedOrder = TryGetCashedOrder(order.BrokerId[0]);
-
-                if(cashedOrder != null && cashedOrder.OrderId.ToStringInvariant() == order.BrokerId[0] && cashedOrder.Status == OrderStatusType.Filled)
-                {
-                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "Oanda Fill Event")
-                    {
-                        Status = OrderStatus.Filled,
-                        FillPrice = cashedOrder.Price,
-                        FillQuantity = cashedOrder.Quantity
-                    });
-
-                    return true;
-                }
-            }
-
             var orderResponse = new OrderModel();
 
             if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
@@ -228,24 +205,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var isCancelSuccess = CancelOrder(id);
 
-                if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
+                if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(10)))
                 {
                     isCancelSuccess = GetOrderByNumber(id).Status == OrderStatusType.Canceled;
-                }
-                else
-                {
-                    isCancelSuccess = _cachedOrdersFromWebSocket[id].Status == OrderStatusType.Canceled;
                 }
                 _onOrderWebSocketResponseEvent.Reset();
 
                 if (isCancelSuccess)
                 {
                     success.Add(isCancelSuccess);
-                    OnOrderEvent(new OrderEvent(order,
-                        DateTime.UtcNow,
-                        OrderFee.Zero,
-                        "TDAmeritrade Order Event")
-                    { Status = OrderStatus.Canceled });
+                    OnOrderEvent(new OrderEvent(order,DateTime.UtcNow,OrderFee.Zero,"TDAmeritrade Order Event"){ Status = OrderStatus.Canceled });
                 }
             }
 
@@ -296,12 +265,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #endregion
 
-        private void Initialize()
+        private void Initialize(string consumerKey, string accessToken, string accountNumber, IMapFileProvider mapFileProvider)
         {
             if (IsInitialized)
             {
                 return;
             }
+
+            _consumerKey = consumerKey;
+            _accessToken = accessToken;
+            _accountNumber = accountNumber;
+            _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);
 
             RestClient = new RestClient(_restApiUrl);
 

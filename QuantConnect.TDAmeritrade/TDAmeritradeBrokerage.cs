@@ -151,7 +151,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted);
 
-            var orderResponse = _cachedOrdersFromWebSocket.Last().Value;
+            var orderResponse = _submitedOrders.Dequeue();
 
             order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 

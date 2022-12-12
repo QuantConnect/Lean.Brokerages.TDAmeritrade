@@ -54,10 +54,17 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         [TestCase(true, "LODE", "AAPL", "IBM")]
         [TestCase(false, "LODEE", "AAPLA", "IBMA")]
+        [TestCase(false, "")]
         public void GetAsk(bool expected, params string[] symbols)
         {
-            var quotes = _brokerage.GetQuotes(symbols);
-            Assert.That(quotes.Count() == symbols.Length, Is.EqualTo(expected));
+            try
+            {
+                var quotes = _brokerage.GetQuotes(symbols);
+                Assert.That(quotes.Count() == symbols.Length, Is.EqualTo(expected));
+            } catch (Exception exception)
+            {
+                Assert.IsTrue(exception is ArgumentException);
+            }
         }
     }
 }

@@ -131,6 +131,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         public IEnumerable<QuoteTDAmeritradeModel> GetQuotes(params string[] symbols)
         {
+            if(symbols.Length == 0 || symbols.Any(string.IsNullOrWhiteSpace))
+            {
+                throw new ArgumentException("TDAmeritradeBrokerage:GetQuotes(): invalid param");
+            }
+
             var request = new RestRequest("marketdata/quotes", Method.GET);
 
             request.AddQueryParameter("apikey", _consumerKey);
@@ -139,19 +144,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             request.AddQueryParameter("symbol", symbolsInOneLine);
 
-            var jsonResponse = Execute<JObject>(request);
+            var response = Execute<string>(request);
 
-            var quotes = new List<QuoteTDAmeritradeModel>(symbols.Length);
+            var symbolQuotes = JsonConvert.DeserializeObject<Dictionary<string, QuoteTDAmeritradeModel>>(response);
 
-            foreach (var symbol in symbols)
-            {
-                if(jsonResponse.ContainsKey(symbol))
-                { 
-                    quotes.Add(JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(jsonResponse[symbol]!.ToString()));
-                }
-            }
-
-            return quotes;
+            return symbolQuotes.Values;
         }
 
         /// <summary>

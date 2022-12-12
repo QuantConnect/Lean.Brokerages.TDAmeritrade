@@ -61,7 +61,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Thread synchronization event, for successful Place Order
         /// </summary>
-        private ManualResetEvent _onOrderWebSocketResponseEvent = new ManualResetEvent(false);
+        private ManualResetEvent _onSumbitOrderWebSocketResponseEvent = new ManualResetEvent(false);
+
+        /// <summary>
+        /// Thread synchronization event, for successful Cancel Order
+        /// </summary>
+        private ManualResetEvent _onCancelOrderWebSocketResponseEvent = new ManualResetEvent(false);
+
+        /// <summary>
+        /// Thread synchronization event, for successful Update Order
+        /// </summary>
+        private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
         { }
@@ -139,17 +149,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            var orderResponse = new OrderModel();
+            WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted);
 
-            if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
-            {
-                orderResponse = GetOrdersByPath().First(); // The list is reversed                
-            }
-            else
-            {
-                orderResponse = _cachedOrdersFromWebSocket.Last().Value;
-            }
-            _onOrderWebSocketResponseEvent.Reset();
+            var orderResponse = _cachedOrdersFromWebSocket.Last().Value;
 
             order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 
@@ -177,17 +179,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var replaceOrderResponse = ReplaceOrder(order);
 
-            var orderResponse = new OrderModel();
+            if (!string.IsNullOrEmpty(replaceOrderResponse))
+            {
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = replaceOrderResponse });
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, replaceOrderResponse));
+                return false;
+            }
 
-            if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
-            {
-                orderResponse = GetOrdersByPath().First(); // The list is reversed                
-            }
-            else
-            {
-                orderResponse = _cachedOrdersFromWebSocket.Last().Value;
-            }
-            _onOrderWebSocketResponseEvent.Reset();
+            WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted);
+
+            var orderResponse = _cachedOrdersFromWebSocket[order.BrokerId.First().ToStringInvariant()];
 
             // replace the brokerage order id
             order.BrokerId[0] = orderResponse.OrderId.ToStringInvariant();
@@ -195,6 +196,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
 
             return true;
+        }
+
+        private void WaitWebSocketResponse(ManualResetEvent webSocketEvent, OrderStatus orderStatus)
+        {
+            if (!webSocketEvent.WaitOne(TimeSpan.FromSeconds(10)))
+            {
+                var error = $"TDAmeritradeBrokerage didn't get response from websocket. Order Status: {orderStatus}";
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, error));
+                throw new BrokerageException($"TDAmeritradeBrokerage: {error}");
+            }
+            webSocketEvent.Reset();
         }
 
         public override bool CancelOrder(Order order)
@@ -205,11 +217,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var isCancelSuccess = CancelOrder(id);
 
-                if (!_onOrderWebSocketResponseEvent.WaitOne(TimeSpan.FromSeconds(10)))
-                {
-                    isCancelSuccess = GetOrderByNumber(id).Status == OrderStatusType.Canceled;
-                }
-                _onOrderWebSocketResponseEvent.Reset();
+                WaitWebSocketResponse(_onCancelOrderWebSocketResponseEvent, OrderStatus.Canceled);
 
                 if (isCancelSuccess)
                 {

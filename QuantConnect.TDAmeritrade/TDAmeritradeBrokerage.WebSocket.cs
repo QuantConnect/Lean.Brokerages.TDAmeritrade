@@ -21,6 +21,8 @@ using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
+using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Packets;
 using QuantConnect.Util;
 using System.Collections.Concurrent;
@@ -587,7 +589,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             };
 
             // Reset Event for PlaceOrder mthd()
-            _onOrderWebSocketResponseEvent.Set();
+            _onSumbitOrderWebSocketResponseEvent.Set();
         }
 
         private void HandleOrderFill(OrderFillMessage? orderFillResponse)
@@ -611,6 +613,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             cashedOrder.Price = orderFillResponse.ExecutionInformation.ExecutionPrice;
             cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
             _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
+
+            var leanOrder = _orderProvider.GetOrderByBrokerageId(brokerageOrderKey);
+
+            var fillEvent = new OrderEvent(leanOrder, orderFillResponse.ExecutionInformation.Timestamp, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
+            {
+                Status = OrderStatus.Filled,
+                FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
+                FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
+            };
+            OnOrderEvent(fillEvent);
+
+            // remove from open orders since it's now closed
+            _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var cachedOrder);
         }
 
         private void HandleOrderCancelRequest(OrderCancelRequestMessage? orderCancelResponse)
@@ -633,7 +648,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
 
             // Reset Event for CancelOrder mthd()
-            _onOrderWebSocketResponseEvent.Set();
+            _onCancelOrderWebSocketResponseEvent.Set();
         }
 
         private void HandleOrderCancelReplaceRequest(OrderCancelReplaceRequestMessage? orderCancelReplaceMessage)
@@ -670,7 +685,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             _cachedOrdersFromWebSocket.TryRemove(oldBrokerageOrderKey, out removedOrderModel);
 
             // Reset Event for UpdateOrder mthd()
-            _onOrderWebSocketResponseEvent.Set();
+            _onUpdateOrderWebSocketResponseEvent.Set();
         }
 
         private void HandleNotifyServiceResponse(JToken content)
@@ -703,20 +718,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
             return default;
         }
-
-        private string ConvertIDExchangeToFullName(char exchangeID) => exchangeID switch
-        {
-            'n' => "NYSE",
-            'q' => "NASDAQ",
-            'p' => "PACIFIC",
-            'g' => "AMEX_INDEX",
-            'm' => "MUTUAL_FUND",
-            '9' => "PINK_SHEET",
-            'a' => "AMEX",
-            'u' => "OTCBB",
-            'x' => "INDICES",
-            _ => "unknown"
-        };
 
         private OrderModel? TryGetCashedOrder(string orderKey)
             => _cachedOrdersFromWebSocket.TryGetValue(orderKey, out OrderModel orderModel) ? orderModel : null;

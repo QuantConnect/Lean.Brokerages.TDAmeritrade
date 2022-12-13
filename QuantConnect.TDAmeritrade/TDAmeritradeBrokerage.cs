@@ -155,7 +155,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted);
+            // If we haven't gotten response from WebSocket than we stop our algorithm.
+            if(!WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted))
+            {
+                return false;
+            }
 
             var orderResponse = _submitedOrders.Dequeue();
 
@@ -192,7 +196,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted);
+            // If we haven't gotten response from WebSocket than we stop our algorithm
+            if (!WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted))
+            {
+                return false;
+            }
 
             var orderResponse = _cachedOrdersFromWebSocket[order.BrokerId.First().ToStringInvariant()];
 
@@ -204,14 +212,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return true;
         }
 
-        private void WaitWebSocketResponse(ManualResetEvent webSocketEvent, OrderStatus orderStatus)
+        private bool WaitWebSocketResponse(ManualResetEvent webSocketEvent, OrderStatus orderStatus)
         {
             if (!webSocketEvent.WaitOne(TimeSpan.FromSeconds(10)))
             {
                 var error = $"TDAmeritradeBrokerage didn't get response from websocket. Order Status: {orderStatus}";
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, error));
+                return false;
             }
             webSocketEvent.Reset();
+            return true;
         }
 
         public override bool CancelOrder(Order order)
@@ -222,7 +232,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var isCancelSuccess = CancelOrder(id);
 
-                WaitWebSocketResponse(_onCancelOrderWebSocketResponseEvent, OrderStatus.Canceled);
+                // If we haven't gotten response from WebSocket than we stop our algorithm
+                if (!WaitWebSocketResponse(_onCancelOrderWebSocketResponseEvent, OrderStatus.Canceled))
+                {
+                    return false;
+                }
 
                 if (isCancelSuccess)
                 {

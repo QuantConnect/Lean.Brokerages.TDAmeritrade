@@ -45,7 +45,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         public TDAmeritradeBrokerageFactory() : base(typeof(TDAmeritradeBrokerage))
         { }
 
-        public override IBrokerageModel GetBrokerageModel(IOrderProvider orderProvider) => new TradierBrokerageModel();
+        public override IBrokerageModel GetBrokerageModel(IOrderProvider orderProvider) => new TDAmeritradeBrokerageModel();
 
         public override IBrokerage CreateBrokerage(LiveNodePacket job, IAlgorithm algorithm)
         {
@@ -56,7 +56,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var accountNumber = Read<string>(job.BrokerageData, "tdameritrade-account-number", errors);
 
             if (errors.Any())
+            {
                 throw new BrokerageException($"TDAmeritradeBrokerageFactory invalid config keys, errors:{String.Join(';', errors)}");
+            }
 
             var brokerage = new TDAmeritradeBrokerage(consumerKey, accessToken, accountNumber, algorithm,
                 Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false), algorithm.Transactions,

@@ -59,7 +59,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public TransactionItem TransactionItem { get; set; }
 
         [JsonProperty(PropertyName = "instrument")]
-        public InstrumentTransaction Instrument { get; set; } = new();
+        public InstrumentModel Instrument { get; set; } = new();
     }
 
     public struct Fees
@@ -105,17 +105,5 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
 
         [JsonProperty(PropertyName = "instruction")]
         public InstructionType Instruction { get; set; }
-    }
-
-    public struct InstrumentTransaction
-    {
-        [JsonProperty(PropertyName = "symbol")]
-        public string Symbol { get; set; }
-
-        [JsonProperty(PropertyName = "cusip")]
-        public string Cusip { get; set; }
-
-        [JsonProperty(PropertyName = "assetType")]
-        public string AssetType { get; set; }
     }
 }

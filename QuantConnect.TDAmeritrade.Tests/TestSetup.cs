@@ -13,7 +13,7 @@
  * limitations under the License.
 */
 
-
+using NUnit.Framework;
 using QuantConnect.Configuration;
 using QuantConnect.Logging;
 using System.Collections;

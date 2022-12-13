@@ -13,6 +13,9 @@
  * limitations under the License.
 */
 
+using NUnit.Framework;
+using QuantConnect.Brokerages.TDAmeritrade;
+
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
     [TestFixture]

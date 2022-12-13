@@ -13,6 +13,11 @@
  * limitations under the License.
 */
 
+using NUnit.Framework;
+using QuantConnect.Configuration;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Brokerages.TDAmeritrade;
+
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
     public class TDAmeritradeBrokerageRestAPITests

@@ -62,7 +62,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
     {
         public ulong OrderKey { get; set; }
 
-        public OrderCancelReplaceRequestMessageOrderSecurity Security { get; set; }
+        public SerializableSecurity Security { get; set; }
 
         public OrderCancelReplaceRequestMessageOrderOrderPricing OrderPricing { get; set; }
 
@@ -93,16 +93,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public string SettlementInstructions { get; set; }
 
         public string EnteringDevice { get; set; }
-    }
-
-    [Serializable()]
-    public partial class OrderCancelReplaceRequestMessageOrderSecurity
-    {
-        public string CUSIP { get; set; }
-
-        public string Symbol { get; set; }
-
-        public string SecurityType { get; set; }
     }
 
     [Serializable()]

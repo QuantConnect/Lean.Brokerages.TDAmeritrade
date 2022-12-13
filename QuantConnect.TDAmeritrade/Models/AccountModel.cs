@@ -80,7 +80,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public decimal SettledShortQuantity { get; set; }
 
         [JsonProperty(PropertyName = "instrument")]
-        public Instrument ProjectedBalances { get; set; } = new();
+        public InstrumentModel ProjectedBalances { get; set; } = new();
 
         [JsonProperty(PropertyName = "marketValue")]
         public decimal MarketValue { get; set; }
@@ -90,19 +90,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
 
         [JsonProperty(PropertyName = "previousSessionLongQuantity")]
         public decimal PreviousSessionLongQuantity { get; set; }
-    }
-
-    public class Instrument
-    {
-        [JsonProperty(PropertyName = "assetType")]
-        public OrderLegType AssetType { get; set; }
-
-        [JsonProperty(PropertyName = "cusip")]
-        public string Cusip { get; set; } = string.Empty;
-
-        [JsonProperty(PropertyName = "symbol")]
-        public string Symbol { get; set; } = string.Empty;
-
     }
 
     public class InitialBalances

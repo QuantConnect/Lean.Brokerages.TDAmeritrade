@@ -167,18 +167,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
         public static string ConvertOrderStatusTypeToString(this OrderStatusType orderStatusType) => orderStatusType switch
         {
             OrderStatusType.NoValue => "No Value",
-            OrderStatusType.AwaitingParentOrder => "AWAITING_PARENT_ORDER",
-            OrderStatusType.AwaitingCondition => "AWAITING_CONDITION",
-            OrderStatusType.AwaitingManualReview => "AWAITING_MANUAL_REVIEW",
+            OrderStatusType.Awaiting_Parent_Order => "AWAITING_PARENT_ORDER",
+            OrderStatusType.Awaiting_Condition => "AWAITING_CONDITION",
+            OrderStatusType.Awaiting_Manual_Review => "AWAITING_MANUAL_REVIEW",
             OrderStatusType.Accepted => "ACCEPTED",
-            OrderStatusType.AwaitingurOut => "AWAITING_UR_OUT",
-            OrderStatusType.PendingActivation => "PENDING_ACTIVATION",
+            OrderStatusType.Awaiting_Ur_Out => "AWAITING_UR_OUT",
+            OrderStatusType.Pending_Activation => "PENDING_ACTIVATION",
             OrderStatusType.Queued => "QUEUED",
             OrderStatusType.Working => "WORKING",
             OrderStatusType.Rejected => "REJECTED",
-            OrderStatusType.PendingCancel => "PENDING_CANCEL",
+            OrderStatusType.Pending_Cancel => "PENDING_CANCEL",
             OrderStatusType.Canceled => "CANCELED",
-            OrderStatusType.PendingReplace => "PENDING_REPLACE",
+            OrderStatusType.Pending_Replace => "PENDING_REPLACE",
             OrderStatusType.Replaced => "REPLACED",
             OrderStatusType.Filled => "FILLED",
             OrderStatusType.Expired => "EXPIRED",
@@ -254,7 +254,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
                 case OrderStatusType.Canceled:
                     return OrderStatus.Canceled;
 
-                case OrderStatusType.PendingActivation:
+                case OrderStatusType.Pending_Activation:
                     return OrderStatus.Submitted;
 
                 case OrderStatusType.Expired:

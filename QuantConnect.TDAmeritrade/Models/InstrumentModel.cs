@@ -14,11 +14,6 @@
 */
 
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace QuantConnect.Brokerages.TDAmeritrade.Models
 {
@@ -40,12 +35,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
         public string AssetType { get; set; } = string.Empty;
 
         public InstrumentModel()
-        { }
-
-        public InstrumentModel(string symbol, string assetType)
         {
-            Symbol = symbol;
-            AssetType = assetType;
         }
     }
 }

@@ -15,6 +15,7 @@
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using NodaTime;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
@@ -24,6 +25,7 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Packets;
+using QuantConnect.Securities;
 using QuantConnect.Util;
 using System.Collections.Concurrent;
 using System.Web;
@@ -53,6 +55,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         private Queue<OrderModel> _submitedOrders = new Queue<OrderModel>();
 
+        // exchange time zones by symbol
+        private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new ();
+
         /// <summary>
         /// XML serializers instance to parse xml from websocket
         /// </summary>
@@ -76,16 +81,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="job">Job we're subscribing for</param>
         public void SetJob(LiveNodePacket job)
         {
-            var consumerKey = job.BrokerageData["tdameritrade-account-number"];
-            var accessToken = job.BrokerageData["tdameritrade-account-number"];
+            var consumerKey = job.BrokerageData["tdameritrade-api-key"];
+            var accessToken = job.BrokerageData["tdameritrade-access-token"];
             var accountNumber = job.BrokerageData["tdameritrade-account-number"];
+            var aggregator = Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(
+                Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false);
 
             Initialize(
                 consumerKey,
                 accessToken,
                 accountNumber,
-                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider"))
-                );
+                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")),
+                aggregator);
 
             if (!IsConnected)
             {
@@ -384,7 +391,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 case "QUOTE":
                     ParseQuoteLevelOneData(token["content"]);
                     break;
-                    break;
                 case "ACCT_ACTIVITY":
                     ParseAccountActivity(token["content"]);
                     break;
@@ -445,9 +451,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var symbolLean = _symbolMapper.GetLeanSymbolByBrokerageWebsocketSymbol(symbol.Symbol);
 
-                DefaultOrderBook symbolOrderBook;
                 // After Unsubscribe, we haven't gotten response already, but update will come in this chanel.
-                if (!_orderBooks.TryGetValue(symbolLean, out symbolOrderBook))
+                if (!_orderBooks.TryGetValue(symbolLean, out var symbolOrderBook))
                 {
                     return;
                 }
@@ -472,7 +477,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
-                    var tradeTime = (Time.UnixTimeStampToDateTime(symbol.TradeTime));
+                    var tradeTime = Time.UnixTimeStampToDateTime(symbol.TradeTime);
                     EmitTradeTick(symbolLean, symbol.LastPrice, symbol.LastSize, tradeTime);
                 }
             }
@@ -493,17 +498,33 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="askSize">The ask price</param>
         private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
         {
+            var exchange = GetSymbolExchange(symbol);
+
             _aggregator.Update(new Tick
             {
                 AskPrice = askPrice,
                 BidPrice = bidPrice,
                 Value = (askPrice + bidPrice) / 2m,
-                Time = DateTime.UtcNow,
+                Time = DateTime.UtcNow.ConvertFromUtc(exchange),
                 Symbol = symbol,
                 TickType = TickType.Quote,
                 AskSize = askSize,
                 BidSize = bidSize
             });
+        }
+
+        private DateTimeZone GetSymbolExchange(Symbol symbol)
+        {
+            lock (_symbolExchangeTimeZones)
+            {
+                if (!_symbolExchangeTimeZones.TryGetValue(symbol, out var exchangeTimeZone))
+                {
+                    // read the exchange time zone from market-hours-database
+                    exchangeTimeZone = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType).TimeZone;
+                    _symbolExchangeTimeZones[symbol] = exchangeTimeZone;
+                }
+                return exchangeTimeZone;
+            }
         }
 
         /// <summary>
@@ -583,7 +604,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Instrument = new InstrumentModel()
                         {
                             AssetType = order.Order.Security.SecurityType,
-                            Cusip = order.Order.Security.CUSIP,
+                            Cusip = order.Order.Security.Cusip,
                             Symbol = order.Order.Security.Symbol
                         },
                         Quantity = order.Order.OriginalQuantity

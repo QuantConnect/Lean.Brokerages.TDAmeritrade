@@ -15,23 +15,13 @@
 
 namespace QuantConnect.Brokerages.TDAmeritrade.Models
 {
-    public enum OrderStatusType
+    [Serializable()]
+    public class SerializableSecurity
     {
-        NoValue = 0,
-        Awaiting_Parent_Order = 1,
-        Awaiting_Condition = 2,
-        Awaiting_Manual_Review = 3,
-        Accepted = 4,
-        Awaiting_Ur_Out = 5,
-        Pending_Activation = 6,
-        Queued = 7,
-        Working = 8,
-        Rejected = 9,
-        Pending_Cancel = 10,
-        Canceled = 11,
-        Pending_Replace = 12,
-        Replaced = 13,
-        Filled = 14,
-        Expired = 15,
+        public string SecurityType { get; set; } = string.Empty;
+
+        public string Cusip { get; set; } = string.Empty;
+
+        public string Symbol { get; set; } = string.Empty;
     }
 }

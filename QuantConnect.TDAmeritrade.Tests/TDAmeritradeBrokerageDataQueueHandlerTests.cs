@@ -13,8 +13,11 @@
  * limitations under the License.
 */
 
-using QuantConnect.Data.Market;
+using NUnit.Framework;
+using QuantConnect.Data;
 using QuantConnect.Logging;
+using QuantConnect.Data.Market;
+using QuantConnect.Brokerages.TDAmeritrade;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {

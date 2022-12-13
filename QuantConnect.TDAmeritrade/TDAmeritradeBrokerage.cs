@@ -52,8 +52,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         private string _wsUrl = "wss://streamer-ws.tdameritrade.com/ws";
 
+        private IDataAggregator _aggregator;
         private readonly IAlgorithm _algorithm;
-        private readonly IDataAggregator _aggregator;
         private readonly IOrderProvider _orderProvider;
 
         private TDAmeritradeSymbolMapper _symbolMapper;
@@ -73,9 +73,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
+        /// <summary>
+        /// Creates a new TDAmeritradeBrokerage
+        /// </summary>
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
-        { }
+        {
+        }
 
+        /// <summary>
+        /// Creates a new TDAmeritradeBrokerage
+        /// </summary>
         public TDAmeritradeBrokerage(
             string consumerKey,
             string accessToken,
@@ -86,10 +93,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             IMapFileProvider mapFileProvider) : base("TD Ameritrade")
         {
             _algorithm = algorithm;
-            _aggregator = aggregator;
             _orderProvider = orderProvider;
 
-            Initialize(consumerKey, accessToken, accountNumber, mapFileProvider);
+            Initialize(consumerKey, accessToken, accountNumber, mapFileProvider, aggregator);
         }
 
         #region TD Ameritrade client
@@ -204,7 +210,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var error = $"TDAmeritradeBrokerage didn't get response from websocket. Order Status: {orderStatus}";
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, error));
-                throw new BrokerageException($"TDAmeritradeBrokerage: {error}");
             }
             webSocketEvent.Reset();
         }
@@ -233,7 +238,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var orders = new List<Order>();
 
-            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.PendingActivation);
+            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Pending_Activation);
 
             foreach (var openOrder in openOrders)
             {
@@ -273,13 +278,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #endregion
 
-        private void Initialize(string consumerKey, string accessToken, string accountNumber, IMapFileProvider mapFileProvider)
+        private void Initialize(string consumerKey, string accessToken, string accountNumber, IMapFileProvider mapFileProvider, IDataAggregator aggregator)
         {
             if (IsInitialized)
             {
                 return;
             }
 
+            _aggregator = aggregator;
             _consumerKey = consumerKey;
             _accessToken = accessToken;
             _accountNumber = accountNumber;
@@ -306,7 +312,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             subscriptionManager.SubscribeImpl += (symbols, _) => Subscribe(symbols);
             subscriptionManager.UnsubscribeImpl += (symbols, _) => Unsubscribe(symbols);
             SubscriptionManager = subscriptionManager;
-
 
             ValidateSubscription();
         }

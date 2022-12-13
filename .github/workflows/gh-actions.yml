@@ -32,7 +32,7 @@ jobs:
         run: mv Lean ../Lean
 
       - name: Build
-        run: dotnet build /p:Configuration=Release /v:quiet /p:WarningLevel=1 QuantConnect.TDAmeritradeBrokerage.sln
+        run: dotnet build /p:Configuration=Release /v:quiet /p:WarningLevel=1 QuantConnect.TDAmeritrade.sln
 
       - name: Run Tests
         run: dotnet test ./QuantConnect.TDAmeritrade.Tests/bin/Release/QuantConnect.TDAmeritradeBrokerage.Tests.dll

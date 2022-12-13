@@ -51,9 +51,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private ConcurrentDictionary<string, OrderModel> _cachedOrdersFromWebSocket = new ConcurrentDictionary<string, OrderModel>();
 
         /// <summary>
-        /// We're caching submit orders
+        /// We're caching submit orders. 
+        /// Collection use only in TDAmeritradeBrokerage.PlaceOrder(), to return correct BrokerId in Lean.Order
         /// </summary>
-        private Queue<OrderModel> _submitedOrders = new Queue<OrderModel>();
+        private ConcurrentQueue<OrderModel> _submitedOrders = new ConcurrentQueue<OrderModel>();
 
         // exchange time zones by symbol
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new ();
@@ -619,8 +620,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                             (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m,
             };
 
+            // the order add in cache collection
             _cachedOrdersFromWebSocket[order.Order.OrderKey.ToStringInvariant()] = orderModel;
 
+            // the order add in queue to return first order to PlaceOrder() with correct brokerID
             _submitedOrders.Enqueue(orderModel);
 
             // Reset Event for PlaceOrder mthd()

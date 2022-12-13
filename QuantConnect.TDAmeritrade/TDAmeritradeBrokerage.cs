@@ -161,7 +161,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            var orderResponse = _submitedOrders.Dequeue();
+            // After we have gotten websocket, we will dequeue order from queue
+            _submitedOrders.TryDequeue(out var orderResponse);
 
             order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 

@@ -112,7 +112,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         protected override bool Subscribe(IEnumerable<Symbol> symbols)
         {
-            var pendingSymbols = new List<string>();
+            var isSubscribeToNewSymbol = false;
 
             foreach (var symbol in symbols)
             {
@@ -120,13 +120,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     _orderBooks[symbol] = CreateOrderBookWithEventBestBidAskUpdate(symbol, OnBestBidAskUpdated);
                     var brokerageSymbol = _symbolMapper.GetBrokerageWebsocketSymbol(symbol);
-                    pendingSymbols.Add(brokerageSymbol);
+                    isSubscribeToNewSymbol = true;
                 }
             }
 
-            if (pendingSymbols.Any())
+            if (isSubscribeToNewSymbol)
             {
-                SubscribeToLevelOne(pendingSymbols.ToArray());
+                SubscribeToLevelOne(_orderBooks.Keys.Select(symbol => _symbolMapper.GetBrokerageWebsocketSymbol(symbol)).ToArray());
             }
 
             return true;
@@ -478,7 +478,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
-                    var tradeTime = Time.UnixTimeStampToDateTime(symbol.TradeTime);
+                    var tradeTime = DateTime.UtcNow.ConvertFromUtc(TimeZones.NewYork);
                     EmitTradeTick(symbolLean, symbol.LastPrice, symbol.LastSize, tradeTime);
                 }
             }
@@ -499,33 +499,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="askSize">The ask price</param>
         private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
         {
-            var exchange = GetSymbolExchange(symbol);
-
             _aggregator.Update(new Tick
             {
                 AskPrice = askPrice,
                 BidPrice = bidPrice,
                 Value = (askPrice + bidPrice) / 2m,
-                Time = DateTime.UtcNow.ConvertFromUtc(exchange),
+                Time = DateTime.UtcNow.ConvertFromUtc(TimeZones.NewYork),
                 Symbol = symbol,
                 TickType = TickType.Quote,
                 AskSize = askSize,
                 BidSize = bidSize
             });
-        }
-
-        private DateTimeZone GetSymbolExchange(Symbol symbol)
-        {
-            lock (_symbolExchangeTimeZones)
-            {
-                if (!_symbolExchangeTimeZones.TryGetValue(symbol, out var exchangeTimeZone))
-                {
-                    // read the exchange time zone from market-hours-database
-                    exchangeTimeZone = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType).TimeZone;
-                    _symbolExchangeTimeZones[symbol] = exchangeTimeZone;
-                }
-                return exchangeTimeZone;
-            }
         }
 
         /// <summary>

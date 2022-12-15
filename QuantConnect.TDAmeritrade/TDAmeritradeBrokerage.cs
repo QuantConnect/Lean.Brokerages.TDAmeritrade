@@ -37,7 +37,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
     /// <summary>
     /// TD Ameritrade Brokerage implementation
     /// </summary>
-    [BrokerageFactory(typeof(TDAmeritradeBrokerage))]
+    [BrokerageFactory(typeof(TDAmeritradeBrokerageFactory))]
     public partial class TDAmeritradeBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
     {
         private string _consumerKey;

@@ -37,7 +37,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid symbol: " + (symbol == null ? "null" : symbol.ToString()));
             }
 
-            if (symbol.ID.SecurityType != SecurityType.Equity 
+            if (symbol.ID.SecurityType != SecurityType.Equity
                 && symbol.ID.SecurityType != SecurityType.Option
                 && symbol.ID.SecurityType != SecurityType.Index
                 && symbol.ID.SecurityType != SecurityType.IndexOption)
@@ -63,18 +63,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var brokerageSymbol = GetBrokerageSymbol(symbol);
 
-            if(brokerageSymbol.Contains('.'))
-            {
-                brokerageSymbol.Replace('.', '/');
-            }
-            else if (brokerageSymbol.Contains('-'))
-            {
-                brokerageSymbol.Replace('-', 'p');
-            }
-            else if(brokerageSymbol.Contains('+'))
-            {
-                brokerageSymbol.Replace("+", "/WS");
-            }
+            brokerageSymbol = brokerageSymbol.Replace('.', '/').Replace('-', 'p').Replace("+", "/WS");
 
             _wsSymbolMap.TryAdd(brokerageSymbol, symbol);
 

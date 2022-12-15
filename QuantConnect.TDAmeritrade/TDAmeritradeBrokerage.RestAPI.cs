@@ -169,7 +169,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Account balances, positions, and orders for a specific account.
         /// </summary>
-        public AccountModel GetAccount(string accountNumber)
+        private AccountModel GetAccount(string accountNumber)
         {
             var request = new RestRequest($"accounts/{accountNumber}", Method.GET);
 
@@ -191,7 +191,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// If 'fromEnteredTime' is not sent, the default `fromEnteredTime` would be 60 days from `toEnteredTime`.
         /// </param>
         /// <param name="orderStatusType">Specifies that only orders of this status should be returned.</param>
-        public IEnumerable<OrderModel> GetOrdersByPath(int? maxResults = null, DateTime? fromEnteredTime = null, DateTime? toEnteredTime = null, OrderStatusType orderStatusType = OrderStatusType.NoValue)
+        private IEnumerable<OrderModel> GetOrdersByPath(int? maxResults = null, DateTime? fromEnteredTime = null, DateTime? toEnteredTime = null, OrderStatusType orderStatusType = OrderStatusType.NoValue)
         {
             var request = new RestRequest($"accounts/{_accountNumber}/orders", Method.GET);
 
@@ -201,25 +201,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// User Principal details
         /// </summary>
-        public UserPrincipalsModel GetUserPrincipals()
+        private UserPrincipalsModel GetUserPrincipals()
         {
             var request = new RestRequest("userprincipals", Method.GET);
 
             request.AddQueryParameter("fields", "streamerSubscriptionKeys,streamerConnectionInfo,preferences,surrogateIds");
 
             return Execute<UserPrincipalsModel>(request);
-        }
-
-        /// <summary>
-        /// Get a specific order for a specific account.
-        /// </summary>
-        /// <param name="orderNumber">order number</param>
-        /// <returns>Brokerage OrderModel</returns>
-        public OrderModel GetOrderByNumber(string orderNumber)
-        {
-            var request = new RestRequest($"accounts/{_accountNumber}/orders/{orderNumber}", Method.GET);
-
-            return Execute<OrderModel>(request);
         }
 
         #endregion
@@ -235,7 +223,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="redirectUrl">Required if trying to use authorization code grant</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public AccessTokenModel PostAccessToken(GrantType grantType, string code)
+        private AccessTokenModel PostAccessToken(GrantType grantType, string code)
         {
             var request = new RestRequest("oauth2/token", Method.POST);
 
@@ -296,7 +284,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return Execute<string>(request);
         }
 
-        public bool CancelOrder(string orderNumber, string? accountNumber = null)
+        private bool CancelOrder(string orderNumber, string? accountNumber = null)
         {
             var account = string.IsNullOrEmpty(accountNumber) ? _accountNumber : accountNumber;
 
@@ -309,7 +297,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region PUT
 
-        public string ReplaceOrder(Orders.Order order)
+        private string ReplaceOrder(Orders.Order order)
         {
             var request = new RestRequest($"accounts/{_accountNumber}/orders/{order.BrokerId[0]}", Method.PUT);
 

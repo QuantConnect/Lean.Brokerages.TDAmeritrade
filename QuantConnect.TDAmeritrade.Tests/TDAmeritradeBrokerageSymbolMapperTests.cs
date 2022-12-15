@@ -36,6 +36,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         //[TestCase("AOL", "AOL")]
         [TestCase("UW", "WM")]
         [TestCase("WMI", "WM")]
+        [TestCase("BF-B", "BF.B")]
         public void MapCorrectBrokerageSymbol(string ticker, string tdAmeritradeSymbol)
         {
             var mapper = new TDAmeritradeSymbolMapper(TestGlobals.MapFileProvider);

@@ -61,9 +61,24 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <exception cref="ArgumentException">Wrong Lean <see cref="Symbol"/></exception>
         public string GetBrokerageWebsocketSymbol(Symbol symbol)
         {
-            _wsSymbolMap.TryAdd(symbol.Value, symbol);
+            var brokerageSymbol = GetBrokerageSymbol(symbol);
 
-            return symbol.ID.Symbol;
+            if(brokerageSymbol.Contains('.'))
+            {
+                brokerageSymbol.Replace('.', '/');
+            }
+            else if (brokerageSymbol.Contains('-'))
+            {
+                brokerageSymbol.Replace('-', 'p');
+            }
+            else if(brokerageSymbol.Contains('+'))
+            {
+                brokerageSymbol.Replace("+", "/WS");
+            }
+
+            _wsSymbolMap.TryAdd(brokerageSymbol, symbol);
+
+            return brokerageSymbol;
         }
 
         /// <summary>
@@ -93,7 +108,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 ticker = mapFile.GetMappedSymbol(DateTime.UtcNow, symbol.Value);
             }
 
-            return ticker;
+            return ConvertLeanSymbolToTDAmeritradeSymbol(ticker);
+        }
+
+        /// <summary>
+        /// Converts a Lean symbol string to an TDAmeritrade symbol
+        /// </summary>
+        private static string ConvertLeanSymbolToTDAmeritradeSymbol(string leanSymbol)
+        {
+            // Lean symbols are equal to TDAmeritrade symbols with dot instead dash
+            return leanSymbol.Replace("-", ".");
         }
     }
 }

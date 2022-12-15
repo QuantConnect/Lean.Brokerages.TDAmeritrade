@@ -140,6 +140,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                 (Symbols.AAPL, Resolution.Minute),
                 (Symbols.SPY, Resolution.Tick),
                 (Symbols.LODE, Resolution.Minute),
+                (Symbol.Create("BF-B", SecurityType.Equity, Market.USA), Resolution.Minute)
             };
 
             var configs = new List<SubscriptionDataConfig>();

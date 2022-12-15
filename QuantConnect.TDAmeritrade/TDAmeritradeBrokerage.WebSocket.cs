@@ -72,6 +72,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         };
 
         /// <summary>
+        /// We keep userPrincipals in first request when Login to system
+        /// Then we need some param to subscribe\unsubscribe in channels
+        /// Also, we decrease amount requests
+        /// </summary>
+        private UserPrincipalsModel userPrincipals;
+
+        /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
         public override bool IsConnected => WebSocket.IsOpen;
@@ -205,7 +212,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if (WebSocket.IsOpen && !string.IsNullOrEmpty(_refreshToken))
             {
-                var userPrincipals = GetUserPrincipals();
+                userPrincipals = GetUserPrincipals();
 
                 var tokenTimeStampAsDateObj = DateTime.Parse(userPrincipals.StreamerInfo.TokenTimestamp).ToUniversalTime();
                 var tokenTimeStampAsMs = Time.DateTimeToUnixTimeStampMilliseconds(tokenTimeStampAsDateObj);
@@ -256,8 +263,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public void LogOut()
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -278,8 +283,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void SubscribeToLevelOne(params string[] symbols)
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -357,8 +360,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void UnSubscribeToLevelOne(params string[] symbols)
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -414,7 +415,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     else
                     {
                         // After login, we need to subscribe to account's Trade activity chanel
-                        var userPrincipals = GetUserPrincipals();
                         SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
                     }
                     break;

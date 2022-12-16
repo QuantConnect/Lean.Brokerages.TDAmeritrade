@@ -111,7 +111,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
                     PostAccessToken(GrantType.RefreshToken, string.Empty);
-                    Execute<T>(request);
+                    response = Execute<T>(request);
                 }
                 else if (request.Resource == "oauth2/token")
                 {
@@ -122,7 +122,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var fault = JsonConvert.DeserializeObject<ErrorModel>(untypedResponse.Content);
                     Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {untypedResponse.Content}");
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
-                    return (T)(object)fault.Error;
                 }
             }
 
@@ -134,7 +133,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     return (T)(object)untypedResponse.Content;
                 }
 
-                return JsonConvert.DeserializeObject<T>(untypedResponse.Content);
+                response = JsonConvert.DeserializeObject<T>(untypedResponse.Content);
             }
             catch (Exception e)
             {
@@ -203,7 +202,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            var orderResponse = _cachedOrdersFromWebSocket[order.BrokerId.First().ToStringInvariant()];
+            var oldBrokerId = order.BrokerId[0].ToStringInvariant();
+
+            // get cached order with oldBrokerId 
+            var orderResponse = _cachedOrdersFromWebSocket[oldBrokerId];
+
+            // remove order from cache collection
+            _cachedOrdersFromWebSocket.TryRemove(oldBrokerId, out var removedOrderModel);
 
             // replace the brokerage order id
             order.BrokerId[0] = orderResponse.OrderId.ToStringInvariant();
@@ -238,10 +243,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     return false;
                 }
+                
+                success.Add(isCancelSuccess);
 
                 if (isCancelSuccess)
                 {
-                    success.Add(isCancelSuccess);
                     OnOrderEvent(new OrderEvent(order,DateTime.UtcNow,OrderFee.Zero,"TDAmeritrade Order Event"){ Status = OrderStatus.Canceled });
                 }
             }
@@ -253,11 +259,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var orders = new List<Order>();
 
-            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Pending_Activation);
+            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Working);
 
             foreach (var openOrder in openOrders)
             {
                 orders.Add(openOrder.ConvertOrder());
+
+                // Add open orders to cached websocket collection  
+                _cachedOrdersFromWebSocket.TryAdd(openOrder.OrderId.ToStringInvariant(), openOrder);
             }
 
             return orders;

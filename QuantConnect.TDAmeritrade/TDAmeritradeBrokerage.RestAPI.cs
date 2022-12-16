@@ -122,8 +122,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var quoteJObject = Execute<JObject>(request);
 
-            return quoteJObject.ContainsKey(symbol) ?
-                JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(quoteJObject[symbol]!.ToString()) : new QuoteTDAmeritradeModel();
+                return quoteJObject.ContainsKey(symbol) ?
+                    JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(quoteJObject[symbol]!.ToString()) : new QuoteTDAmeritradeModel();
         }
 
         /// <summary>
@@ -146,9 +146,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var response = Execute<string>(request);
 
-            var symbolQuotes = JsonConvert.DeserializeObject<Dictionary<string, QuoteTDAmeritradeModel>>(response);
-
-            return symbolQuotes.Values;
+            return JsonConvert.DeserializeObject<Dictionary<string, QuoteTDAmeritradeModel>>(response).Values;
         }
 
         /// <summary>
@@ -451,11 +449,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 new PlaceOrderLegCollectionModel(
                     order.Direction.ConvertLeanOrderDirectionToExchange(),
                     Math.Abs(order.Quantity),
-                    new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
+                    new InstrumentPlaceOrderModel(instrument, order.Symbol.SecurityType.ToString().ToUpper())
                     )
             };
 
-            var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
+            var isOrderMarket = order.Type == Orders.OrderType.Market;
 
             var brokerageOrderType = order.Type.ConvertLeanOrderTypeToExchange();
 

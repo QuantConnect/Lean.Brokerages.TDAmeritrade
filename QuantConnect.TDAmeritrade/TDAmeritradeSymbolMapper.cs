@@ -39,8 +39,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (symbol.ID.SecurityType != SecurityType.Equity
                 && symbol.ID.SecurityType != SecurityType.Option
-                && symbol.ID.SecurityType != SecurityType.Index
-                && symbol.ID.SecurityType != SecurityType.IndexOption)
+                && symbol.ID.SecurityType != SecurityType.Index)
             {
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid security type: " + symbol.ID.SecurityType);
             }

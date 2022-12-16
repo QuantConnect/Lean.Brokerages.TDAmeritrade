@@ -714,11 +714,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                                     (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m;
             cashedOrder.Quantity = orderCancelReplaceMessage.PendingCancelQuantity;
 
+            cashedOrder.OrderId = newBrokerageOrderKey;
+
             // add new order to cache collection
             _cachedOrdersFromWebSocket[newBrokerageOrderKey.ToStringInvariant()] = cashedOrder;
-            // remove order from cache collection
-            OrderModel removedOrderModel;
-            _cachedOrdersFromWebSocket.TryRemove(oldBrokerageOrderKey, out removedOrderModel);
 
             // Reset Event for UpdateOrder mthd()
             _onUpdateOrderWebSocketResponseEvent.Set();

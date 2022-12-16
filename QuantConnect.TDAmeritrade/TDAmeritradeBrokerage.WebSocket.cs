@@ -51,9 +51,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private ConcurrentDictionary<string, OrderModel> _cachedOrdersFromWebSocket = new ConcurrentDictionary<string, OrderModel>();
 
         /// <summary>
-        /// We're caching submit orders
+        /// We're caching submit orders. 
+        /// Collection use only in TDAmeritradeBrokerage.PlaceOrder(), to return correct BrokerId in Lean.Order
         /// </summary>
-        private Queue<OrderModel> _submitedOrders = new Queue<OrderModel>();
+        private ConcurrentQueue<OrderModel> _submitedOrders = new ConcurrentQueue<OrderModel>();
 
         // exchange time zones by symbol
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new ();
@@ -69,6 +70,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))},
             { typeof(OrderRouteMessage), new XmlSerializer(typeof(OrderRouteMessage))}
         };
+
+        /// <summary>
+        /// We keep userPrincipals in first request when Login to system
+        /// Then we need some param to subscribe\unsubscribe in channels
+        /// Also, we decrease amount requests
+        /// </summary>
+        private UserPrincipalsModel _userPrincipals;
 
         /// <summary>
         /// Returns true if we're currently connected to the broker
@@ -111,7 +119,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         protected override bool Subscribe(IEnumerable<Symbol> symbols)
         {
-            var pendingSymbols = new List<string>();
+            var isSubscribeToNewSymbol = false;
 
             foreach (var symbol in symbols)
             {
@@ -119,13 +127,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     _orderBooks[symbol] = CreateOrderBookWithEventBestBidAskUpdate(symbol, OnBestBidAskUpdated);
                     var brokerageSymbol = _symbolMapper.GetBrokerageWebsocketSymbol(symbol);
-                    pendingSymbols.Add(brokerageSymbol);
+                    isSubscribeToNewSymbol = true;
                 }
             }
 
-            if (pendingSymbols.Any())
+            if (isSubscribeToNewSymbol)
             {
-                SubscribeToLevelOne(pendingSymbols.ToArray());
+                SubscribeToLevelOne(_orderBooks.Keys.Select(symbol => _symbolMapper.GetBrokerageWebsocketSymbol(symbol)).ToArray());
             }
 
             return true;
@@ -200,27 +208,27 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
-        public void Login()
+        private void Login()
         {
             if (WebSocket.IsOpen && !string.IsNullOrEmpty(_refreshToken))
             {
-                var userPrincipals = GetUserPrincipals();
+                _userPrincipals = GetUserPrincipals();
 
-                var tokenTimeStampAsDateObj = DateTime.Parse(userPrincipals.StreamerInfo.TokenTimestamp).ToUniversalTime();
+                var tokenTimeStampAsDateObj = DateTime.Parse(_userPrincipals.StreamerInfo.TokenTimestamp).ToUniversalTime();
                 var tokenTimeStampAsMs = Time.DateTimeToUnixTimeStampMilliseconds(tokenTimeStampAsDateObj);
 
                 var queryString = HttpUtility.ParseQueryString(string.Empty);
 
-                queryString.Add("userid", userPrincipals.Accounts[0].AccountId);
-                queryString.Add("company", userPrincipals.Accounts[0].Company);
-                queryString.Add("segment", userPrincipals.Accounts[0].Segment);
-                queryString.Add("cddomain", userPrincipals.Accounts[0].AccountCdDomainId);
+                queryString.Add("userid", _userPrincipals.Accounts[0].AccountId);
+                queryString.Add("company", _userPrincipals.Accounts[0].Company);
+                queryString.Add("segment", _userPrincipals.Accounts[0].Segment);
+                queryString.Add("cddomain", _userPrincipals.Accounts[0].AccountCdDomainId);
 
-                queryString.Add("token", userPrincipals.StreamerInfo.Token);
-                queryString.Add("usergroup", userPrincipals.StreamerInfo.UserGroup);
-                queryString.Add("accessLevel", userPrincipals.StreamerInfo.AccessLevel);
-                queryString.Add("appId", userPrincipals.StreamerInfo.AppId);
-                queryString.Add("acl", userPrincipals.StreamerInfo.Acl);
+                queryString.Add("token", _userPrincipals.StreamerInfo.Token);
+                queryString.Add("usergroup", _userPrincipals.StreamerInfo.UserGroup);
+                queryString.Add("accessLevel", _userPrincipals.StreamerInfo.AccessLevel);
+                queryString.Add("appId", _userPrincipals.StreamerInfo.AppId);
+                queryString.Add("acl", _userPrincipals.StreamerInfo.Acl);
 
                 queryString.Add("timestamp", tokenTimeStampAsMs.ToString());
                 queryString.Add("authorized", "Y");
@@ -237,11 +245,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Service = "ADMIN",
                         Command = "LOGIN",
                         Requestid = Interlocked.Increment(ref _requestIdCounter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
+                        Account = _userPrincipals.Accounts[0].AccountId,
+                        Source = _userPrincipals.StreamerInfo.AppId,
                         Parameters = new
                         {
-                            token = userPrincipals.StreamerInfo.Token,
+                            token = _userPrincipals.StreamerInfo.Token,
                             version = "1.0",
                             credential = encoded,
                         }
@@ -253,10 +261,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
         }
 
-        public void LogOut()
+        private void LogOut()
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -266,8 +272,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Service = "ADMIN",
                         Command = "LOGOUT",
                         Requestid = Interlocked.Increment(ref _requestIdCounter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
+                        Account = _userPrincipals.Accounts[0].AccountId,
+                        Source = _userPrincipals.StreamerInfo.AppId,
                         Parameters = new { }
                     }
     }
@@ -277,8 +283,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void SubscribeToLevelOne(params string[] symbols)
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -288,8 +292,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Service = "QUOTE",
                         Command = "SUBS",
                         Requestid = Interlocked.Increment(ref _requestIdCounter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
+                        Account = _userPrincipals.Accounts[0].AccountId,
+                        Source = _userPrincipals.StreamerInfo.AppId,
                         Parameters = new
                         {
                             keys = $"{string.Join(",", symbols)}",
@@ -356,8 +360,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void UnSubscribeToLevelOne(params string[] symbols)
         {
-            var userPrincipals = GetUserPrincipals();
-
             var request = new StreamRequestModelContainer
             {
                 Requests = new StreamRequestModel[]
@@ -367,8 +369,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                         Service = "QUOTE",
                         Command = "UNSUBS",
                         Requestid = Interlocked.Increment(ref _requestIdCounter),
-                        Account = userPrincipals.Accounts[0].AccountId,
-                        Source = userPrincipals.StreamerInfo.AppId,
+                        Account = _userPrincipals.Accounts[0].AccountId,
+                        Source = _userPrincipals.StreamerInfo.AppId,
                         Parameters = new
                         {
                             keys = $"{string.Join(",", symbols)}"
@@ -413,8 +415,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     else
                     {
                         // After login, we need to subscribe to account's Trade activity chanel
-                        var userPrincipals = GetUserPrincipals();
-                        SubscribeToAccountActivity(userPrincipals, userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
+                        SubscribeToAccountActivity(_userPrincipals, _userPrincipals.StreamerSubscriptionKeys.Keys[0].Key);
                     }
                     break;
                 case "LOGOUT":
@@ -477,7 +478,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 if (symbol.LastPrice > 0 && symbol.LastSize > 0)
                 {
-                    var tradeTime = Time.UnixTimeStampToDateTime(symbol.TradeTime);
+                    var tradeTime = DateTime.UtcNow.ConvertFromUtc(GetSymbolExchange(symbolLean));
                     EmitTradeTick(symbolLean, symbol.LastPrice, symbol.LastSize, tradeTime);
                 }
             }
@@ -498,33 +499,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <param name="askSize">The ask price</param>
         private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
         {
-            var exchange = GetSymbolExchange(symbol);
-
-            _aggregator.Update(new Tick
+             _aggregator.Update(new Tick
             {
                 AskPrice = askPrice,
                 BidPrice = bidPrice,
                 Value = (askPrice + bidPrice) / 2m,
-                Time = DateTime.UtcNow.ConvertFromUtc(exchange),
+                Time = DateTime.UtcNow.ConvertFromUtc(GetSymbolExchange(symbol)),
                 Symbol = symbol,
                 TickType = TickType.Quote,
                 AskSize = askSize,
                 BidSize = bidSize
             });
-        }
-
-        private DateTimeZone GetSymbolExchange(Symbol symbol)
-        {
-            lock (_symbolExchangeTimeZones)
-            {
-                if (!_symbolExchangeTimeZones.TryGetValue(symbol, out var exchangeTimeZone))
-                {
-                    // read the exchange time zone from market-hours-database
-                    exchangeTimeZone = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType).TimeZone;
-                    _symbolExchangeTimeZones[symbol] = exchangeTimeZone;
-                }
-                return exchangeTimeZone;
-            }
         }
 
         /// <summary>
@@ -540,6 +525,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 TickType = TickType.Trade,
                 Quantity = size
             });
+        }
+
+        private DateTimeZone GetSymbolExchange(Symbol symbol)
+        {
+            lock (_symbolExchangeTimeZones)
+            {
+                if (!_symbolExchangeTimeZones.TryGetValue(symbol, out var exchangeTimeZone))
+                {
+                    // read the exchange time zone from market-hours-database
+                    exchangeTimeZone = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType).TimeZone;
+                    _symbolExchangeTimeZones[symbol] = exchangeTimeZone;
+                }
+                return exchangeTimeZone;
+            }
         }
 
         private void ParseAccountActivity(JToken content)
@@ -619,8 +618,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                             (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m,
             };
 
+            // the order add in cache collection
             _cachedOrdersFromWebSocket[order.Order.OrderKey.ToStringInvariant()] = orderModel;
 
+            // the order add in queue to return first order to PlaceOrder() with correct brokerID
             _submitedOrders.Enqueue(orderModel);
 
             // Reset Event for PlaceOrder mthd()

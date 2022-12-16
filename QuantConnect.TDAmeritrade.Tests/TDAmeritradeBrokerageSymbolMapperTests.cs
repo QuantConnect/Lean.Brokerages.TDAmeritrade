@@ -35,7 +35,8 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         //[TestCase("TWX", "TWX")] // - Time Warner Inc TWX
         //[TestCase("AOL", "AOL")]
         [TestCase("UW", "WM")]
-        [TestCase("WMI", "WMI")]
+        [TestCase("WMI", "WM")]
+        [TestCase("BF-B", "BF.B")]
         public void MapCorrectBrokerageSymbol(string ticker, string tdAmeritradeSymbol)
         {
             var mapper = new TDAmeritradeSymbolMapper(TestGlobals.MapFileProvider);

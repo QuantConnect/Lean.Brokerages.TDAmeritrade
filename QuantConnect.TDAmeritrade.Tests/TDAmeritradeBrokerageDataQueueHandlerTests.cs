@@ -18,6 +18,7 @@ using QuantConnect.Data;
 using QuantConnect.Logging;
 using QuantConnect.Data.Market;
 using QuantConnect.Brokerages.TDAmeritrade;
+using System.Collections.Concurrent;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
@@ -75,7 +76,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                             dataReceivedForType[typeof(Tick)] += 1;
                         }
                         if (tick is TradeBar tradeBar)
-                        { 
+                        {
                             Log.Debug($"TradeBar: {tick}");
                             Assert.That(tick.Symbol, Is.EqualTo(config.Symbol));
                             Assert.IsTrue(tick.DataType == MarketDataType.TradeBar);
@@ -122,6 +123,70 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
                     Assert.AreEqual(dataReceivedForType[dataType], 0);
                 }
             }
+
+            cancelationToken.Cancel();
+        }
+
+        [Test]
+        public void MultipleSubscriptions()
+        {
+            var symbolSubscriptionResult = new Dictionary<Symbol, bool>();
+            var symbolTickResult = new ConcurrentDictionary<Symbol, int>();
+            var unsubscribeOneSymbolAngGetAnotherOne = new Dictionary<Symbol, bool>();
+            var unsubscribeOneSymbol = true;
+
+            var symbols = new List<(Symbol symbol, Resolution resolution)>
+            {
+                (Symbols.AAPL, Resolution.Minute),
+                (Symbols.SPY, Resolution.Tick),
+                (Symbols.LODE, Resolution.Minute),
+                (Symbol.Create("BF-B", SecurityType.Equity, Market.USA), Resolution.Minute)
+            };
+
+            var configs = new List<SubscriptionDataConfig>();
+            foreach (var symbol in symbols)
+            {
+                configs.Add(GetSubscriptionDataConfig<QuoteBar>(symbol.symbol, symbol.resolution));
+            }
+
+            var cancelationToken = new CancellationTokenSource();
+            var brokerage = (TDAmeritradeBrokerage)Brokerage;
+
+            foreach (var config in configs)
+            {
+                ProcessFeed(brokerage.Subscribe(config, (s, e) => { }),
+                    cancelationToken,
+                    (tick) =>
+                    {
+                        if (tick != null)
+                        {
+                            symbolTickResult.AddOrUpdate(tick.Symbol, 1, (Symbol, count) => count + 1);
+
+                            symbolSubscriptionResult[tick.Symbol] = true;
+                            unsubscribeOneSymbolAngGetAnotherOne[tick.Symbol] = true;
+
+                            if (unsubscribeOneSymbol)
+                            {
+                                unsubscribeOneSymbol = false;
+                                unsubscribeOneSymbolAngGetAnotherOne[tick.Symbol] = false;
+                                brokerage.Unsubscribe(configs.First(x => x.Symbol == tick.Symbol));
+                            }
+                        }
+                    });
+            }
+
+            Thread.Sleep(20000);
+
+            foreach (var config in configs)
+            {
+                brokerage.Unsubscribe(config);
+            }
+
+            Thread.Sleep(10000);
+
+            Assert.IsTrue(symbolSubscriptionResult.Values.All(value => value));
+            Assert.IsFalse(unsubscribeOneSymbolAngGetAnotherOne.Values.All(value => value));
+            Assert.IsTrue(symbolTickResult.Values.All(value => value > 0));
 
             cancelationToken.Cancel();
         }

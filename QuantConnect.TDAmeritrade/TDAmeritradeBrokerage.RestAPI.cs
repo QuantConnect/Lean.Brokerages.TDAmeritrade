@@ -453,48 +453,32 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     )
             };
 
-            var isOrderMarket = order.Type == Orders.OrderType.Market;
-
-            var brokerageOrderType = order.Type.ConvertLeanOrderTypeToExchange();
-
-            if (brokerageOrderType != OrderType.Market)
+            if (order.Type != Orders.OrderType.Market)
             {
                 body["complexOrderStrategyType"] = ComplexOrderStrategyType.None.ConvertComplexOrderStrategyTypeToString();
             }
 
-            var limitPrice = 0m;
-            if (!isOrderMarket)
+            if (order.Type == Orders.OrderType.Limit || order.Type == Orders.OrderType.StopLimit)
             {
                 var limitPriceWithoudRound =
                     (order as Orders.LimitOrder)?.LimitPrice ??
                     (order as Orders.StopLimitOrder)?.LimitPrice ?? 0m;
 
-                limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
+                body["price"] = limitPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            if (brokerageOrderType == OrderType.Limit || brokerageOrderType == OrderType.StopLimit)
-            {
-                body["price"] = limitPrice;
-            }
-
-            body["orderType"] = brokerageOrderType.ConvertOrderTypeToString();
+            body["orderType"] = order.Type.ConvertLeanOrderTypeToExchange().ConvertOrderTypeToString();
             body["session"] = SessionType.Normal.ConvertSessionTypeToString();
             body["duration"] = DurationType.Day.ConvertDurationTypeToString();
             body["orderStrategyType"] = OrderStrategyType.Single.ConvertOrderStrategyTypeToString();
             body["orderLegCollection"] = orderLegCollection;
 
-            var stopPrice = 0m;
-            if (order.Type == Orders.OrderType.StopLimit || order.Type == Orders.OrderType.StopMarket)
+            if (order.Type == Orders.OrderType.StopMarket || order.Type == Orders.OrderType.StopLimit)
             {
                 var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ??
                                     (order as Orders.StopMarketOrder)?.StopPrice ?? 0m;
 
-                stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
-            }
-
-            if (brokerageOrderType == OrderType.StopLimit || brokerageOrderType == OrderType.Stop)
-            {
-                body["stopPrice"] = stopPrice;
+                body["stopPrice"] = stopPriceWithoudRound.RoundAmountToExachangeFormat(); ;
             }
 
             return JsonConvert.SerializeObject(body);

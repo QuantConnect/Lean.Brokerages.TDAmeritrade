@@ -51,6 +51,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             return quotes.Single().AskPrice;
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void GetQuotesDoesNotReturnNull()
         {
@@ -61,46 +62,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsNotEmpty(quotes);
         }
 
-        [TestCase("AAPL", Resolution.Minute)]
-        [TestCase("AAPL", Resolution.Hour)]
-        [TestCase("AAPL", Resolution.Daily)]
-        public void TestHistoryProvider_GetHistory(string ticker, Resolution resolution)
-        {
-            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
-
-            DateTime startDateTime = DateTime.UtcNow.AddDays(-2.0);
-            DateTime endDateTime = DateTime.UtcNow;
-
-            var historyRequest = new HistoryRequest(
-                new SubscriptionDataConfig(typeof(TradeBar), symbol, resolution, DateTimeZone.Utc, DateTimeZone.Utc, true, true, true),
-                SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
-                startDateTime,
-                endDateTime);
-
-            var histories = Brokerage.GetHistory(historyRequest);
-
-            Assert.IsNotEmpty(histories);
-
-            var history = histories.FirstOrDefault();
-
-            Assert.IsNotNull(history);
-
-            Assert.Greater(history.Price, 0m);
-            Assert.Greater(history.Value, 0m);
-            Assert.That(history.Symbol.Value, Is.EqualTo(ticker).NoClip);
-
-            Assert.IsTrue(history.DataType == MarketDataType.TradeBar);
-
-            TradeBar historyBar = (TradeBar)history;
-
-            Assert.Greater(historyBar.Low, 0m);
-            Assert.Greater(historyBar.Close, 0m);
-            Assert.Greater(historyBar.High, 0m);
-            Assert.Greater(historyBar.Open, 0m);
-
-        }
-
-        //[Ignore("Ignore to save cash")]
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void PlaceOrderMarket()
         {
@@ -113,7 +75,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsTrue(isPlaceOrder);
         }
 
-        [Ignore("Ignore to save cash")]
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void PlaceOrderLimit()
         {
@@ -128,7 +90,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsTrue(isPlaceOrder);
         }
 
-        [Ignore("Ignore to save cash")]
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void PlaceOrderStopLimit()
         {

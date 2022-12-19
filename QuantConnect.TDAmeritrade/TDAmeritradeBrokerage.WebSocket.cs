@@ -650,9 +650,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
             _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
 
-            var leanOrder = GetLeanOrderById(brokerageOrderKey);
+            var (isOrderExsist, leanOrder) = TryGetLeanOrderById(brokerageOrderKey);
 
-            if (leanOrder == null)
+            if (!isOrderExsist)
             {
                 return;
             }
@@ -749,9 +749,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var leanOrder = GetLeanOrderById(brokerageOrderKey);
+            var (isOrderExsist, leanOrder) = TryGetLeanOrderById(brokerageOrderKey);
 
-            if (leanOrder == null)
+            if (!isOrderExsist)
             {
                 return;
             }
@@ -810,7 +810,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return orderBook;
         }
 
-        private Order? GetLeanOrderById(string orderID)
+        private (bool, Order?) TryGetLeanOrderById(string orderID)
         {
             var leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
 
@@ -818,9 +818,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 Log.Error("TDAmeritradeBrokerage.WebSocket.HandleOrderRoute(): Lean order didn't find or one have been filled already.");
                 _cachedOrdersFromWebSocket.TryRemove(orderID, out var order);
-                return null;
+                return (false, leanOrder);
             }
-            return leanOrder;
+            return (true, leanOrder);
         }
 
 }

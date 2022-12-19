@@ -74,6 +74,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
         /// <summary>
+        /// The object is Lock thread in PlaceOrder() method
+        /// </summary>
+        private object _onPLaceOrderLockObject = new object();
+
+        /// <summary>
         /// Creates a new TDAmeritradeBrokerage
         /// </summary>
         public TDAmeritradeBrokerage() : base("TD Ameritrade")
@@ -160,15 +165,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            // After we have gotten websocket, we will dequeue order from queue
-            _submitedOrders.TryDequeue(out var orderResponse);
+            lock(_onPLaceOrderLockObject)
+            { 
+                // After we have gotten websocket, we will dequeue order from queue
+                _submitedOrders.TryDequeue(out var orderResponse);
 
-            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
+                order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
 
-            OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
-            Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
-
-            return true;
+                OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
+                { Status = OrderStatus.Submitted });
+                Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
+                return true;
+            }
         }
 
         /// <summary>
@@ -243,7 +251,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 {
                     return false;
                 }
-                
+
                 success.Add(isCancelSuccess);
 
                 if (isCancelSuccess)

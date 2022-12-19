@@ -13,13 +13,10 @@
  * limitations under the License.
 */
 
-using NodaTime;
 using NUnit.Framework;
-using QuantConnect.Data;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
-using QuantConnect.Data.Market;
 using QuantConnect.Configuration;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Brokerages.TDAmeritrade;
@@ -62,47 +59,25 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.IsNotEmpty(quotes);
         }
 
-        [Explicit("This test requires a configured and testable account")]
-        [Test]
-        public void PlaceOrderMarket()
+        /// <summary>
+        /// Provides the data required to test each order type in various cases
+        /// </summary>
+        private static TestCaseData[] OrderParameters()
         {
-            var symbol = Symbols.LODE;
-
-            var order = new MarketOrder(symbol, 1, DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
+            return new[]
+            {
+                new TestCaseData(new MarketOrderTestParameters(Symbols.LODE)).SetName("MarketOrder"),
+                new TestCaseData(new LimitOrderTestParameters(Symbols.LODE, 1m, 0.01m)).SetName("LimitOrder"),
+                new TestCaseData(new StopMarketOrderTestParameters(Symbols.LODE, 1m, 0.01m)).SetName("StopMarketOrder"),
+                new TestCaseData(new StopLimitOrderTestParameters(Symbols.LODE, 0.5m, 0.51m)).SetName("StopLimitOrder")
+            };
         }
 
         [Explicit("This test requires a configured and testable account")]
-        [Test]
-        public void PlaceOrderLimit()
+        [Test, TestCaseSource(nameof(OrderParameters))]
+        public override void LongFromZero(OrderTestParameters parameters)
         {
-            var symbol = Symbols.LODE;
-
-            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
-
-            var order = new LimitOrder(symbol, 1, price + (price * 0.1m), DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
-        }
-
-        [Explicit("This test requires a configured and testable account")]
-        [Test]
-        public void PlaceOrderStopLimit()
-        {
-            var symbol = Symbols.LODE;
-
-            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
-
-            var order = new StopLimitOrder(symbol, 1, price + (price * 0.1m), price + (price * 0.2m), DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
+            base.LongFromZero(parameters);
         }
     }
 }

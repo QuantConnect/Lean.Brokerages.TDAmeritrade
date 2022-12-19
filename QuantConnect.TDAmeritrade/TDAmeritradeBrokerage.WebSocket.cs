@@ -650,7 +650,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
             _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
 
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(brokerageOrderKey);
+            var leanOrder = GetLeanOrderById(brokerageOrderKey);
+
+            if (leanOrder == null)
+            {
+                return;
+            }
 
             var fillEvent = new OrderEvent(leanOrder, orderFillResponse.ExecutionInformation.Timestamp, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
             {
@@ -744,7 +749,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(brokerageOrderKey);
+            var leanOrder = GetLeanOrderById(brokerageOrderKey);
+
+            if (leanOrder == null)
+            {
+                return;
+            }
 
             var fillEvent = new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
             {
@@ -799,5 +809,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             orderBook.BestBidAskUpdated += updateEvent;
             return orderBook;
         }
-    }
+
+        private Order? GetLeanOrderById(string orderID)
+        {
+            var leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
+
+            if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)
+            {
+                Log.Error("TDAmeritradeBrokerage.WebSocket.HandleOrderRoute(): Lean order didn't find or one have been filled already.");
+                _cachedOrdersFromWebSocket.TryRemove(orderID, out var order);
+                return null;
+            }
+            return leanOrder;
+        }
+
+}
 }

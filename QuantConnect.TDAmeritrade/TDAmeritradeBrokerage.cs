@@ -105,18 +105,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region TD Ameritrade client
 
-        private T Execute<T>(RestRequest request)
+        private T? Execute<T>(RestRequest request)
         {
-            var response = default(T);
-
             var untypedResponse = RestClient.Execute(request);
 
             if (!untypedResponse.IsSuccessful)
             {
                 if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
-                    PostAccessToken(GrantType.RefreshToken, string.Empty);
-                    response = Execute<T>(request);
+                    // Get new access token
+                    var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
+                    // Update access token in request parameter
+                    RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
+                    untypedResponse = RestClient.Execute(request);
                 }
                 else if (request.Resource == "oauth2/token")
                 {
@@ -138,14 +139,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     return (T)(object)untypedResponse.Content;
                 }
 
-                response = JsonConvert.DeserializeObject<T>(untypedResponse.Content);
+                return JsonConvert.DeserializeObject<T>(untypedResponse.Content);
             }
             catch (Exception e)
             {
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {untypedResponse.Content} Error: {e.Message}"));
+                return default;
             }
-
-            return response;
         }
 
         public override bool PlaceOrder(Order order)
@@ -332,7 +332,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (!string.IsNullOrEmpty(_refreshToken))
             {
-                PostAccessToken(GrantType.RefreshToken, string.Empty);
+                var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
+                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
             }
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);

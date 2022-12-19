@@ -644,21 +644,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
+            // TODO: remove. Should not change the order directly, the emitted order events are the ones which through Lean engine change the order state
             cashedOrder.Status = OrderStatusType.Filled;
             cashedOrder.CloseTime = orderFillResponse.ExecutionInformation.Timestamp.ToStringInvariant();
             cashedOrder.Price = orderFillResponse.ExecutionInformation.ExecutionPrice;
             cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
             _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
 
-            var (isOrderExsist, leanOrder) = TryGetLeanOrderById(brokerageOrderKey);
-
-            if (!isOrderExsist)
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
                 return;
             }
 
             var fillEvent = new OrderEvent(leanOrder, orderFillResponse.ExecutionInformation.Timestamp, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
             {
+                // TODO: Same comment as bellow, partial fills/fill price
                 Status = OrderStatus.Filled,
                 FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
                 FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
@@ -710,6 +710,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var newBrokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey;
 
+            // TODO: remove. Should not change the order directly, the emitted order events are the ones which through Lean engine change the order state
             cashedOrder.Status = OrderStatusType.Replaced;
             cashedOrder.OrderId = newBrokerageOrderKey;
 
@@ -736,7 +737,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             var brokerageOrderKey = orderRouteMessage.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
+            var cashedOrder = TryGetCashedOrder(brokerageOrderKey);
 
             if (cashedOrder == null)
             {
@@ -744,28 +745,29 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
+            // TODO what about other order types?
             if(cashedOrder.OrderType.ToUpper() != "MARKET")
             {
                 return;
             }
 
-            var (isOrderExsist, leanOrder) = TryGetLeanOrderById(brokerageOrderKey);
-
-            if (!isOrderExsist)
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
                 return;
             }
 
             var fillEvent = new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
             {
+                // TODO what about partial fills?
                 Status = OrderStatus.Filled,
+                // The fill price should come from the brokerage message not from Lean?
                 FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
                 FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
             };
             OnOrderEvent(fillEvent);
 
             // remove from open orders since it's now closed
-            _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var cachedOrder);
+            _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var _);
 
         }
 
@@ -810,17 +812,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return orderBook;
         }
 
-        private (bool, Order?) TryGetLeanOrderById(string orderID)
+        private bool TryGetLeanOrderById(string orderID, out Order leanOrder)
         {
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
+            leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
 
             if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)
             {
                 Log.Error("TDAmeritradeBrokerage.WebSocket.HandleOrderRoute(): Lean order didn't find or one have been filled already.");
-                _cachedOrdersFromWebSocket.TryRemove(orderID, out var order);
-                return (false, leanOrder);
+                _cachedOrdersFromWebSocket.TryRemove(orderID, out var _);
+                return false;
             }
-            return (true, leanOrder);
+            return true;
         }
 
 }

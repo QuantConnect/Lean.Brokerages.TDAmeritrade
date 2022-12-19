@@ -43,8 +43,8 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         protected override decimal GetAskPrice(Symbol symbol)
         {
-            var tradier = (TDAmeritradeBrokerage)Brokerage;
-            var quotes = tradier.GetQuotes(symbol);
+            var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
+            var quotes = tdameritrade.GetQuotes(symbol);
             return quotes.Single().AskPrice;
         }
 
@@ -52,8 +52,8 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         [Test]
         public void GetQuotesDoesNotReturnNull()
         {
-            var tradier = (TDAmeritradeBrokerage)Brokerage;
-            var quotes = tradier.GetQuotes(Symbol.Value);
+            var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
+            var quotes = tdameritrade.GetQuotes(Symbol.Value);
 
             Assert.IsNotNull(quotes);
             Assert.IsNotEmpty(quotes);

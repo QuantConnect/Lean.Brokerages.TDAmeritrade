@@ -165,7 +165,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            lock(_onPLaceOrderLockObject)
+            // TODO: this wont work as expected
+            // The race condition we want to avoid is getting the fill event from the websocket and sending it to lean, even before we've emited the submitted event here.
+            // Maybe to solve this we could follow the same pattern that we use for '_onSumbitOrderWebSocketResponseEvent' just inverted, websocket waits for us to finish this method
+            // after setting '_onSumbitOrderWebSocketResponseEvent'
+            lock (_onPLaceOrderLockObject)
             { 
                 // After we have gotten websocket, we will dequeue order from queue
                 _submitedOrders.TryDequeue(out var orderResponse);

@@ -37,9 +37,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid symbol: " + (symbol == null ? "null" : symbol.ToString()));
             }
 
-            if (symbol.ID.SecurityType != SecurityType.Equity
-                && symbol.ID.SecurityType != SecurityType.Option
-                && symbol.ID.SecurityType != SecurityType.Index)
+            if (symbol.ID.SecurityType != SecurityType.Equity)
             {
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid security type: " + symbol.ID.SecurityType);
             }
@@ -87,10 +85,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string GetMappedTicker(Symbol symbol)
         {
             var ticker = symbol.ID.Symbol;
-            if (symbol.ID.SecurityType == SecurityType.Equity ||
-                symbol.ID.SecurityType == SecurityType.Option ||
-                symbol.ID.SecurityType == SecurityType.Index ||
-                    symbol.ID.SecurityType == SecurityType.IndexOption)
+            if (symbol.ID.SecurityType == SecurityType.Equity)
             {
                 var mapFile = _mapFileProvider.Get(AuxiliaryDataKey.Create(symbol)).ResolveMapFile(symbol);
                 ticker = mapFile.GetMappedSymbol(DateTime.UtcNow, symbol.Value);

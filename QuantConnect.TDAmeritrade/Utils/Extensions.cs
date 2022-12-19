@@ -15,8 +15,6 @@
 
 using QuantConnect.Brokerages.TDAmeritrade.Models;
 using QuantConnect.Orders;
-using System.Reflection;
-using System.Runtime.Serialization;
 using OrderTypeBrokerage = QuantConnect.Brokerages.TDAmeritrade.Models.OrderType;
 
 namespace QuantConnect.Brokerages.TDAmeritrade.Utils
@@ -197,7 +195,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
         {
             Order qcOrder;
 
-            var symbol = order.OrderLegCollections[0].Instrument.Symbol;// _symbolMapper.GetLeanSymbol(order.Class == TradierOrderClass.Option ? order.OptionSymbol : order.Symbol);
+            var symbol = order.OrderLegCollections[0].Instrument.Symbol;
             var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ConvertStringToInstructionType());
             var time = order.EnteredTime;
 
@@ -216,7 +214,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
                     qcOrder = new StopLimitOrder(symbol, quantity, order.StopPrice, order.Price, time);
                     break;
                 default:
-                    throw new NotImplementedException("The Tradier order type " + order.OrderType + " is not implemented.");
+                    throw new NotImplementedException("The TDAmeritrade order type " + order.OrderType + " is not implemented.");
             }
 
             qcOrder.Status = ConvertStatus(order.Status);

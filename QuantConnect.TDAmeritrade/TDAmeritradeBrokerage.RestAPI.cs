@@ -472,7 +472,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            if (brokerageOrderType != OrderType.Market)
+            if (brokerageOrderType == OrderType.Limit || brokerageOrderType == OrderType.StopLimit)
             {
                 body["price"] = limitPrice;
             }
@@ -484,13 +484,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             body["orderLegCollection"] = orderLegCollection;
 
             var stopPrice = 0m;
-            if (order.Type == Orders.OrderType.StopLimit)
+            if (order.Type == Orders.OrderType.StopLimit || order.Type == Orders.OrderType.StopMarket)
             {
-                var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ?? 0;
+                var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ??
+                                    (order as Orders.StopMarketOrder)?.StopPrice ?? 0m;
+
                 stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            if (brokerageOrderType == OrderType.StopLimit)
+            if (brokerageOrderType == OrderType.StopLimit || brokerageOrderType == OrderType.Stop)
             {
                 body["stopPrice"] = stopPrice;
             }

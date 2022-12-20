@@ -814,6 +814,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private bool TryGetLeanOrderById(string orderID, out Order leanOrder)
         {
+            _onPlaceOrderBrokerageIdResponseEvent.WaitOne();
+
             leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
 
             if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)

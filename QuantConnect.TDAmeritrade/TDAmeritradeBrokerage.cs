@@ -73,10 +73,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
-        /// <summary>
-        /// The object is Lock thread in PlaceOrder() method
-        /// </summary>
-        private object _onPLaceOrderLockObject = new object();
+        private ManualResetEvent _onPlaceOrderBrokerageIdResponseEvent = new ManualResetEvent(true);
 
         /// <summary>
         /// Creates a new TDAmeritradeBrokerage
@@ -150,37 +147,34 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override bool PlaceOrder(Order order)
         {
+            _onPlaceOrderBrokerageIdResponseEvent.Reset();
             var placeOrderResponse = PostPlaceOrder(order);
 
             if (!string.IsNullOrEmpty(placeOrderResponse))
             {
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = placeOrderResponse });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, placeOrderResponse));
+                _onPlaceOrderBrokerageIdResponseEvent.Set();
                 return false;
             }
 
             // If we haven't gotten response from WebSocket than we stop our algorithm.
             if(!WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted))
             {
+                _onPlaceOrderBrokerageIdResponseEvent.Set();
                 return false;
             }
 
-            // TODO: this wont work as expected
-            // The race condition we want to avoid is getting the fill event from the websocket and sending it to lean, even before we've emited the submitted event here.
-            // Maybe to solve this we could follow the same pattern that we use for '_onSumbitOrderWebSocketResponseEvent' just inverted, websocket waits for us to finish this method
-            // after setting '_onSumbitOrderWebSocketResponseEvent'
-            lock (_onPLaceOrderLockObject)
-            { 
-                // After we have gotten websocket, we will dequeue order from queue
-                _submitedOrders.TryDequeue(out var orderResponse);
-
-                order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
-
-                OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
-                { Status = OrderStatus.Submitted });
-                Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
-                return true;
-            }
+            // After we have gotten websocket, we will dequeue order from queue
+            _submitedOrders.TryDequeue(out var orderResponse);
+            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
+        
+            OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
+            { Status = OrderStatus.Submitted });
+            Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
+            
+            _onPlaceOrderBrokerageIdResponseEvent.Set();
+            return true;
         }
 
         /// <summary>

@@ -814,12 +814,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private bool TryGetLeanOrderById(string orderID, out Order leanOrder)
         {
-            _onPlaceOrderBrokerageIdResponseEvent.WaitOne();
-
             leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
 
             if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)
             {
+                if (_onPlaceOrderBrokerageIdResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
+                {
+                    // the order was still being processed but now it's ready to be fetched, let's retry
+                    _onPlaceOrderBrokerageIdResponseEvent.Reset();
+                    return TryGetLeanOrderById(orderID, out leanOrder);
+                }
                 Log.Error("TDAmeritradeBrokerage.WebSocket.HandleOrderRoute(): Lean order didn't find or one have been filled already.");
                 _cachedOrdersFromWebSocket.TryRemove(orderID, out var _);
                 return false;

@@ -256,8 +256,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             foreach (var hold in positions)
             {
                 var brokerageSymbol = hold.ProjectedBalances.Symbol;
+                var leanSecurityType = hold.ProjectedBalances.AssetType.ConvertBrokerageSecurityTypeToLeanSecurityType();
 
-                var symbol = Symbol.Create(brokerageSymbol, SecurityType.Equity, Market.USA);
+                var symbol = _symbolMapper.GetLeanSymbol(brokerageSymbol, leanSecurityType, Market.USA);
 
                 holdings.Add(new Holding()
                 {

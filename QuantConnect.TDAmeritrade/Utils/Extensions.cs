@@ -293,5 +293,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
         /// <returns></returns>
         public static decimal RoundAmountToExachangeFormat(this decimal amount)
             => amount < 1m ? amount.RoundToSignificantDigits(4) : amount.RoundToSignificantDigits(2);
+
+        public static SecurityType ConvertBrokerageSecurityTypeToLeanSecurityType(this string brokerageSecurityType) => brokerageSecurityType switch
+        {
+            "EQUITY" => SecurityType.Equity,
+            _ => throw new ArgumentException($"TDAmeritrade doesn't support of SecurityType {nameof(brokerageSecurityType)}")
+        };
     }
 }

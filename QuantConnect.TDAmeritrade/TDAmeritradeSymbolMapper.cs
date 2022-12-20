@@ -47,7 +47,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public Symbol GetLeanSymbol(string brokerageSymbol, SecurityType securityType, string market, DateTime expirationDate = default, decimal strike = 0, OptionRight optionRight = OptionRight.Call)
         {
-            throw new NotImplementedException();
+            var leanSymbolFormat = ConvertTDAmeritradeSymbolToLeanSymbol(brokerageSymbol);
+            return Symbol.Create(leanSymbolFormat, securityType, Market.USA);
         }
 
         /// <summary>
@@ -101,6 +102,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             // Lean symbols are equal to TDAmeritrade symbols with dot instead dash
             return leanSymbol.Replace("-", ".");
+        }
+
+        /// <summary>
+        /// Converts TDAmeritrade symbol string to a Lean symbol
+        /// </summary>
+        private static string ConvertTDAmeritradeSymbolToLeanSymbol(string brokerageSymbol)
+        {
+            // Lean symbols are equal to TDAmeritrade symbols with dot instead dash
+            return brokerageSymbol.Replace(".", "-");
         }
     }
 }

@@ -154,6 +154,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         }
 
         /// <summary>
+        /// Get Symbols Quotes last prices 
+        /// </summary>
+        /// <param name="symbols"></param>
+        /// <returns>Brokerage Symbol, Last Price</returns>
+        private Dictionary<string, decimal> GetQuotesLastPrice(IEnumerable<string> symbols) =>
+            GetQuotes(symbols.ToArray()).ToDictionary(x => x.Symbol, x => x.LastPrice);
+
+        /// <summary>
         /// User have to redirect by this url to copy code from url
         /// </summary>
         /// <param name="redirectUrl"></param>
@@ -287,7 +295,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.DELETE);
 
-            return string.IsNullOrEmpty(Execute<string>(request)) ? false : true;
+            return string.IsNullOrEmpty(Execute<string>(request));
         }
 
         #endregion

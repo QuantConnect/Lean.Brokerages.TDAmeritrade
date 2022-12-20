@@ -167,9 +167,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             // After we have gotten websocket, we will dequeue order from queue
             _submitedOrders.TryDequeue(out var orderResponse);
-            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
+            order.BrokerId.Add(orderResponse);
         
-            OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
+            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
             { Status = OrderStatus.Submitted });
             Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
             
@@ -202,25 +202,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            // If we haven't gotten response from WebSocket than we stop our algorithm
-            if (!WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted))
-            {
-                return false;
-            }
-
-            var oldBrokerId = order.BrokerId[0].ToStringInvariant();
-
-            // get cached order with oldBrokerId 
-            var orderResponse = _cachedOrdersFromWebSocket[oldBrokerId];
-
-            // remove order from cache collection
-            _cachedOrdersFromWebSocket.TryRemove(oldBrokerId, out var removedOrderModel);
-
-            // replace the brokerage order id
-            order.BrokerId[0] = orderResponse.OrderId.ToStringInvariant();
-
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
-
             return true;
         }
 
@@ -244,18 +225,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var isCancelSuccess = CancelOrder(id);
 
-                // If we haven't gotten response from WebSocket than we stop our algorithm
-                if (!WaitWebSocketResponse(_onCancelOrderWebSocketResponseEvent, OrderStatus.Canceled))
-                {
-                    return false;
-                }
-
                 success.Add(isCancelSuccess);
-
-                if (isCancelSuccess)
-                {
-                    OnOrderEvent(new OrderEvent(order,DateTime.UtcNow,OrderFee.Zero,"TDAmeritrade Order Event"){ Status = OrderStatus.Canceled });
-                }
             }
 
             return success.All(a => a);
@@ -270,9 +240,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             foreach (var openOrder in openOrders)
             {
                 orders.Add(openOrder.ConvertOrder());
-
-                // Add open orders to cached websocket collection  
-                _cachedOrdersFromWebSocket.TryAdd(openOrder.OrderId.ToStringInvariant(), openOrder);
             }
 
             return orders;
@@ -284,15 +251,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var holdings = new List<Holding>(positions.Count);
 
+            var quotes = GetQuotesLastPrice(positions.Select(x => x.ProjectedBalances.Symbol));
+
             foreach (var hold in positions)
             {
-                var symbol = Symbol.Create(hold.ProjectedBalances.Symbol, SecurityType.Equity, Market.USA);
+                var brokerageSymbol = hold.ProjectedBalances.Symbol;
+
+                var symbol = Symbol.Create(brokerageSymbol, SecurityType.Equity, Market.USA);
 
                 holdings.Add(new Holding()
                 {
                     Symbol = symbol,
                     AveragePrice = hold.AveragePrice,
-                    MarketPrice = hold.MarketValue,
+                    MarketPrice = quotes[brokerageSymbol],
                     Quantity = hold.LongQuantity + hold.ShortQuantity,
                     MarketValue = hold.MarketValue
                 });

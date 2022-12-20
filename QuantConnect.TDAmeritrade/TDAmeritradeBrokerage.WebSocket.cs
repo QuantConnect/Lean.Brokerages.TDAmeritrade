@@ -636,20 +636,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             var brokerageOrderKey = orderFillResponse.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
-
-            if (cashedOrder == null)
-            {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
-                return;
-            }
-
-            // TODO: remove. Should not change the order directly, the emitted order events are the ones which through Lean engine change the order state
-            cashedOrder.Status = OrderStatusType.Filled;
-            cashedOrder.CloseTime = orderFillResponse.ExecutionInformation.Timestamp.ToStringInvariant();
-            cashedOrder.Price = orderFillResponse.ExecutionInformation.ExecutionPrice;
-            cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
-            _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
 
             if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
@@ -660,8 +646,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 // TODO: Same comment as bellow, partial fills/fill price
                 Status = OrderStatus.Filled,
-                FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
-                FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
+                FillPrice = orderFillResponse.ExecutionInformation.ExecutionPrice,
+                FillQuantity = orderFillResponse.ExecutionInformation.Quantity
             };
             OnOrderEvent(fillEvent);
 
@@ -710,46 +696,32 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var newBrokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey;
 
-            // TODO: remove. Should not change the order directly, the emitted order events are the ones which through Lean engine change the order state
-            cashedOrder.Status = OrderStatusType.Replaced;
+            // Update orderId to newOne in oldOrderId Key
             cashedOrder.OrderId = newBrokerageOrderKey;
 
-            cashedOrder.Price = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingLimit)?.Limit ??
-                                (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Limit ?? 0m;
-            cashedOrder.StopPrice = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopMarket)?.Stop ??
-                                    (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m;
-            cashedOrder.Quantity = orderCancelReplaceMessage.PendingCancelQuantity;
-
-            cashedOrder.OrderId = newBrokerageOrderKey;
-
-            // add new order to cache collection
+            // Add new order to cache collection
             _cachedOrdersFromWebSocket[newBrokerageOrderKey.ToStringInvariant()] = cashedOrder;
 
             // Reset Event for UpdateOrder mthd()
             _onUpdateOrderWebSocketResponseEvent.Set();
         }
 
+        /// <summary>
+        /// Sometimes, Brokerage doesn't return response about filled MARKET order.
+        /// But, The brokerage always returns some summary data about orders.
+        /// This method handles summary messages for MARKET Orders, in order to understand if it's filled.
+        /// Other Order types (NOT MARKET) are handled in other methods.
+        /// </summary>
+        /// <see cref="HandleOrderFill(OrderFillMessage?)"/>
+        /// <param name="orderRouteMessage">websocket response</param>
         private void HandleOrderRoute(OrderRouteMessage? orderRouteMessage)
         {
-            if (orderRouteMessage == null)
+            if (orderRouteMessage == null || orderRouteMessage.Order.OrderType.ToUpper() != "MARKET")
             {
                 return;
             }
 
             var brokerageOrderKey = orderRouteMessage.Order.OrderKey.ToStringInvariant();
-            var cashedOrder = TryGetCashedOrder(brokerageOrderKey);
-
-            if (cashedOrder == null)
-            {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
-                return;
-            }
-
-            // TODO what about other order types?
-            if(cashedOrder.OrderType.ToUpper() != "MARKET")
-            {
-                return;
-            }
 
             if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
@@ -762,13 +734,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 Status = OrderStatus.Filled,
                 // The fill price should come from the brokerage message not from Lean?
                 FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
-                FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
+                FillQuantity = orderRouteMessage.Order.OriginalQuantity
             };
             OnOrderEvent(fillEvent);
 
             // remove from open orders since it's now closed
             _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var _);
-
         }
 
         private void HandleNotifyServiceResponse(JToken content)

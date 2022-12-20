@@ -166,8 +166,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             // After we have gotten websocket, we will dequeue order from queue
-            _submitedOrders.TryDequeue(out var orderResponse);
-            order.BrokerId.Add(orderResponse);
+            _submittedOrderIds.TryDequeue(out var orderIdResponse);
+            order.BrokerId.Add(orderIdResponse);
         
             OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
             { Status = OrderStatus.Submitted });

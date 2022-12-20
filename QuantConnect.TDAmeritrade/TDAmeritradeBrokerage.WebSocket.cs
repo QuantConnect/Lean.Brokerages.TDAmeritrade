@@ -49,7 +49,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// We're caching submit orders. 
         /// Collection use only in TDAmeritradeBrokerage.PlaceOrder(), to return correct BrokerId in Lean.Order
         /// </summary>
-        private ConcurrentQueue<string> _submitedOrders = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> _submittedOrderIds = new ConcurrentQueue<string>();
 
         // exchange time zones by symbol
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new ();
@@ -63,7 +63,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
             { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))},
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))},
-            { typeof(OrderRouteMessage), new XmlSerializer(typeof(OrderRouteMessage))}
+            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))}
         };
 
         /// <summary>
@@ -569,6 +569,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
                     HandleOrderFill(orderFill);
                     break;
+                case "UROUT": // Indicates "You Are Out" - that the order has been canceled
+                    var urout = DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
+                    HandleUroutResponse(urout);
+                    break;
             }
         }
 
@@ -580,7 +584,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             // the order add in queue to return first order to PlaceOrder() with correct brokerID
-            _submitedOrders.Enqueue(order.Order.OrderKey.ToStringInvariant());
+            _submittedOrderIds.Enqueue(order.Order.OrderKey.ToStringInvariant());
 
             // Reset Event for PlaceOrder mthd()
             _onSumbitOrderWebSocketResponseEvent.Set();
@@ -624,7 +628,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event") { Status = OrderStatus.Canceled });
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event") 
+            { Status = OrderStatus.CancelPending });
         }
 
         private void HandleOrderCancelReplaceRequest(OrderCancelReplaceRequestMessage? orderCancelReplaceMessage)
@@ -646,6 +651,24 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             leanOrder.BrokerId[0] = newBrokerageOrderKey;
 
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
+        }
+
+        private void HandleUroutResponse(UROUTMessage? uroutMessage)
+        {
+            if(uroutMessage == null)
+            {
+                return;
+            }
+
+            var brokerageOrderKey = uroutMessage.Order.OrderKey.ToStringInvariant();
+
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
+            {
+                return;
+            }
+
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
+            { Status = OrderStatus.Canceled });
         }
 
         private void HandleNotifyServiceResponse(JToken content)

@@ -79,5 +79,25 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         {
             base.LongFromZero(parameters);
         }
+
+        private static TestCaseData[] ShortOrderParameters()
+        {
+            var orderProperties = new OrderProperties();
+            orderProperties.TimeInForce = TimeInForce.Day;
+            return new[]
+            {
+                new TestCaseData(new MarketOrderTestParameters(Symbols.LODE, properties: orderProperties)).SetName("MarketOrder"),
+                new TestCaseData(new LimitOrderTestParameters(Symbols.LODE, 1m, 0.26m, properties: orderProperties)).SetName("LimitOrder"),
+                new TestCaseData(new StopMarketOrderTestParameters(Symbols.LODE, 1000m, 0.01m, properties: orderProperties)).SetName("StopMarketOrder"),
+                new TestCaseData(new StopLimitOrderTestParameters(Symbols.LODE, 1000m, 0.01m, properties: orderProperties)).SetName("StopLimitOrder")
+            };
+        }
+
+        [Explicit("This test requires a configured and testable account")]
+        [Test, TestCaseSource(nameof(ShortOrderParameters))]
+        public override void ShortFromLong(OrderTestParameters parameters)
+        {
+            base.ShortFromLong(parameters);
+        }
     }
 }

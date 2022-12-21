@@ -16,6 +16,7 @@
 		<RootNamespace>QuantConnect.TDAmeritradeBrokerage.Tests</RootNamespace>
 		<AssemblyTitle>QuantConnect.TDAmeritradeBrokerage.Tests</AssemblyTitle>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<RunSettingsFilePath>$(MSBuildProjectDirectory)\nunit.runsettings</RunSettingsFilePath>
 	</PropertyGroup>
 
 	<ItemGroup>

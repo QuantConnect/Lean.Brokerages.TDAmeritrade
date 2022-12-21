@@ -45,6 +45,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             _brokerage = new TDAmeritradeBrokerage(_apiKey, _codeFromUrl, _accountNumber, null, new AggregationManager(), null, TestGlobals.MapFileProvider);
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void GetSignInUrl()
         {
@@ -57,6 +58,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.That(url, Does.Contain(_apiKey));
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [TestCase(true, "LODE", "AAPL", "IBM")]
         [TestCase(false, "LODEE", "AAPLA", "IBMA")]
         [TestCase(false, "")]

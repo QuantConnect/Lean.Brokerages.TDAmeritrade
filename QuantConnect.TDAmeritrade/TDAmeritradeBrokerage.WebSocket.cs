@@ -46,15 +46,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private readonly ConcurrentDictionary<Symbol, DefaultOrderBook> _orderBooks = new ConcurrentDictionary<Symbol, DefaultOrderBook>();
 
         /// <summary>
-        /// We're caching orders to increase speed of getting info about ones
-        /// </summary>
-        private ConcurrentDictionary<string, OrderModel> _cachedOrdersFromWebSocket = new ConcurrentDictionary<string, OrderModel>();
-
-        /// <summary>
         /// We're caching submit orders. 
         /// Collection use only in TDAmeritradeBrokerage.PlaceOrder(), to return correct BrokerId in Lean.Order
         /// </summary>
-        private ConcurrentQueue<OrderModel> _submitedOrders = new ConcurrentQueue<OrderModel>();
+        private ConcurrentQueue<string> _submittedOrderIds = new ConcurrentQueue<string>();
 
         // exchange time zones by symbol
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new ();
@@ -68,7 +63,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
             { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))},
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))},
-            { typeof(OrderRouteMessage), new XmlSerializer(typeof(OrderRouteMessage))}
+            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))}
         };
 
         /// <summary>
@@ -574,9 +569,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
                     HandleOrderFill(orderFill);
                     break;
-                case "OrderRoute":
-                    var orderRoute = DeserializeXMLExecutionResponse<OrderRouteMessage>(accountActivityData.Value.MessageData);
-                    HandleOrderRoute(orderRoute);
+                case "UROUT": // Indicates "You Are Out" - that the order has been canceled
+                    var urout = DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
+                    HandleUroutResponse(urout);
                     break;
             }
         }
@@ -588,41 +583,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var orderModel = new OrderModel()
-            {
-                AccountId = order.OrderGroupID.AccountKey,
-                EnteredTime = order.ActivityTimestamp,
-                Duration = order.Order.OrderDuration,
-                Editable = true,
-                OrderId = order.Order.OrderKey,
-                OrderLegCollections = new List<OrderLegCollectionModel>()
-                {
-                    new OrderLegCollectionModel()
-                    {
-                        InstructionType = order.Order.OrderInstructions.ToStringInvariant(),
-                        Instrument = new InstrumentModel()
-                        {
-                            AssetType = order.Order.Security.SecurityType,
-                            Cusip = order.Order.Security.Cusip,
-                            Symbol = order.Order.Security.Symbol
-                        },
-                        Quantity = order.Order.OriginalQuantity
-                    }
-                },
-                Quantity = order.Order.OriginalQuantity,
-                OrderType = order.Order.OrderType.ToString(),
-                Price = (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingLimit)?.Limit ??
-                        (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingStopLimit)?.Limit ?? 0m,
-                Status = OrderStatusType.Working,
-                StopPrice = (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingStopMarket)?.Stop ??
-                            (order.Order.OrderPricing as OrderEntryRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m,
-            };
-
-            // the order add in cache collection
-            _cachedOrdersFromWebSocket[order.Order.OrderKey.ToStringInvariant()] = orderModel;
-
             // the order add in queue to return first order to PlaceOrder() with correct brokerID
-            _submitedOrders.Enqueue(orderModel);
+            _submittedOrderIds.Enqueue(order.Order.OrderKey.ToStringInvariant());
 
             // Reset Event for PlaceOrder mthd()
             _onSumbitOrderWebSocketResponseEvent.Set();
@@ -636,32 +598,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             var brokerageOrderKey = orderFillResponse.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
 
-            if (cashedOrder == null)
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
                 return;
             }
 
-            cashedOrder.Status = OrderStatusType.Filled;
-            cashedOrder.CloseTime = orderFillResponse.ExecutionInformation.Timestamp.ToStringInvariant();
-            cashedOrder.Price = orderFillResponse.ExecutionInformation.ExecutionPrice;
-            cashedOrder.Quantity = orderFillResponse.ExecutionInformation.Quantity;
-            _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
-
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(brokerageOrderKey);
-
             var fillEvent = new OrderEvent(leanOrder, orderFillResponse.ExecutionInformation.Timestamp, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
             {
+                // TODO: Same comment as bellow, partial fills/fill price
                 Status = OrderStatus.Filled,
-                FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
-                FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
+                FillPrice = orderFillResponse.ExecutionInformation.ExecutionPrice,
+                FillQuantity = orderFillResponse.ExecutionInformation.Quantity
             };
             OnOrderEvent(fillEvent);
-
-            // remove from open orders since it's now closed
-            _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var cachedOrder);
         }
 
         private void HandleOrderCancelRequest(OrderCancelRequestMessage? orderCancelResponse)
@@ -672,19 +622,14 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             var brokerageOrderKey = orderCancelResponse.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
 
-            if (cashedOrder == null)
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderCancelRequest(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
                 return;
             }
 
-            cashedOrder.Status = OrderStatusType.Canceled;
-            _cachedOrdersFromWebSocket[brokerageOrderKey] = cashedOrder;
-
-            // Reset Event for CancelOrder mthd()
-            _onCancelOrderWebSocketResponseEvent.Set();
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event") 
+            { Status = OrderStatus.CancelPending });
         }
 
         private void HandleOrderCancelReplaceRequest(OrderCancelReplaceRequestMessage? orderCancelReplaceMessage)
@@ -695,69 +640,35 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             var oldBrokerageOrderKey = orderCancelReplaceMessage.OriginalOrderId.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(oldBrokerageOrderKey);
 
-            if (cashedOrder == null)
+            var newBrokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey.ToStringInvariant();
+
+            if (!TryGetLeanOrderById(oldBrokerageOrderKey, out var leanOrder))
             {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {oldBrokerageOrderKey}");
                 return;
             }
 
-            var newBrokerageOrderKey = orderCancelReplaceMessage.Order.OrderKey;
+            leanOrder.BrokerId[0] = newBrokerageOrderKey;
 
-            cashedOrder.Status = OrderStatusType.Replaced;
-            cashedOrder.OrderId = newBrokerageOrderKey;
-
-            cashedOrder.Price = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingLimit)?.Limit ??
-                                (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Limit ?? 0m;
-            cashedOrder.StopPrice = (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopMarket)?.Stop ??
-                                    (orderCancelReplaceMessage.Order.OrderPricing as OrderCancelReplaceRequestMessageOrderOrderPricingStopLimit)?.Stop ?? 0m;
-            cashedOrder.Quantity = orderCancelReplaceMessage.PendingCancelQuantity;
-
-            // add new order to cache collection
-            _cachedOrdersFromWebSocket[newBrokerageOrderKey.ToStringInvariant()] = cashedOrder;
-            // remove order from cache collection
-            OrderModel removedOrderModel;
-            _cachedOrdersFromWebSocket.TryRemove(oldBrokerageOrderKey, out removedOrderModel);
-
-            // Reset Event for UpdateOrder mthd()
-            _onUpdateOrderWebSocketResponseEvent.Set();
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
         }
 
-        private void HandleOrderRoute(OrderRouteMessage? orderRouteMessage)
+        private void HandleUroutResponse(UROUTMessage? uroutMessage)
         {
-            if (orderRouteMessage == null)
+            if(uroutMessage == null)
             {
                 return;
             }
 
-            var brokerageOrderKey = orderRouteMessage.Order.OrderKey.ToStringInvariant();
-            OrderModel cashedOrder = TryGetCashedOrder(brokerageOrderKey);
+            var brokerageOrderKey = uroutMessage.Order.OrderKey.ToStringInvariant();
 
-            if (cashedOrder == null)
-            {
-                Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:HandleOrderFill(): Unable to locate order with BrokerageId: {brokerageOrderKey}");
-                return;
-            }
-
-            if(cashedOrder.OrderType.ToUpper() != "MARKET")
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
             {
                 return;
             }
 
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(brokerageOrderKey);
-
-            var fillEvent = new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
-            {
-                Status = OrderStatus.Filled,
-                FillPrice = _cachedOrdersFromWebSocket[brokerageOrderKey].Price,
-                FillQuantity = _cachedOrdersFromWebSocket[brokerageOrderKey].Quantity
-            };
-            OnOrderEvent(fillEvent);
-
-            // remove from open orders since it's now closed
-            _cachedOrdersFromWebSocket.TryRemove(brokerageOrderKey, out var cachedOrder);
-
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
+            { Status = OrderStatus.Canceled });
         }
 
         private void HandleNotifyServiceResponse(JToken content)
@@ -791,14 +702,30 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             return default;
         }
 
-        private OrderModel? TryGetCashedOrder(string orderKey)
-            => _cachedOrdersFromWebSocket.TryGetValue(orderKey, out OrderModel orderModel) ? orderModel : null;
-
         private DefaultOrderBook CreateOrderBookWithEventBestBidAskUpdate(Symbol symbol, EventHandler<BestBidAskUpdatedEventArgs> updateEvent)
         {
             var orderBook = new DefaultOrderBook(symbol);
             orderBook.BestBidAskUpdated += updateEvent;
             return orderBook;
         }
-    }
+
+        private bool TryGetLeanOrderById(string orderID, out Order leanOrder)
+        {
+            leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
+
+            if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)
+            {
+                if (_onPlaceOrderBrokerageIdResponseEvent.WaitOne(TimeSpan.FromSeconds(5)))
+                {
+                    // the order was still being processed but now it's ready to be fetched, let's retry
+                    _onPlaceOrderBrokerageIdResponseEvent.Reset();
+                    return TryGetLeanOrderById(orderID, out leanOrder);
+                }
+                Log.Error("TDAmeritradeBrokerage.WebSocket.HandleOrderRoute(): Lean order didn't find or one have been filled already.");
+                return false;
+            }
+            return true;
+        }
+
+}
 }

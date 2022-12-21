@@ -122,8 +122,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var quoteJObject = Execute<JObject>(request);
 
-            return quoteJObject.ContainsKey(symbol) ?
-                JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(quoteJObject[symbol]!.ToString()) : new QuoteTDAmeritradeModel();
+            if(quoteJObject != null && quoteJObject.ContainsKey(symbol))
+            {
+                return JsonConvert.DeserializeObject<QuoteTDAmeritradeModel>(quoteJObject[symbol]!.ToString());
+            }
+            
+            return new QuoteTDAmeritradeModel();
         }
 
         /// <summary>
@@ -146,10 +150,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var response = Execute<string>(request);
 
-            var symbolQuotes = JsonConvert.DeserializeObject<Dictionary<string, QuoteTDAmeritradeModel>>(response);
-
-            return symbolQuotes.Values;
+            return JsonConvert.DeserializeObject<Dictionary<string, QuoteTDAmeritradeModel>>(response).Values;
         }
+
+        /// <summary>
+        /// Get Symbols Quotes last prices 
+        /// </summary>
+        /// <param name="symbols"></param>
+        /// <returns>Brokerage Symbol, Last Price</returns>
+        private Dictionary<string, decimal> GetQuotesLastPrice(IEnumerable<string> symbols) =>
+            GetQuotes(symbols.ToArray()).ToDictionary(x => x.Symbol, x => x.LastPrice);
 
         /// <summary>
         /// User have to redirect by this url to copy code from url
@@ -260,11 +270,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var accessTokens = Execute<AccessTokenModel>(request);
 
-            if (grantType == GrantType.RefreshToken)
-            {
-                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
-            }
-
             return accessTokens;
         }
 
@@ -290,7 +295,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var request = new RestRequest($"accounts/{account}/orders/{orderNumber}", Method.DELETE);
 
-            return string.IsNullOrEmpty(Execute<string>(request)) ? false : true;
+            return string.IsNullOrEmpty(Execute<string>(request));
         }
 
         #endregion
@@ -451,50 +456,36 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 new PlaceOrderLegCollectionModel(
                     order.Direction.ConvertLeanOrderDirectionToExchange(),
                     Math.Abs(order.Quantity),
-                    new InstrumentPlaceOrderModel(order.Symbol.Value, order.Symbol.SecurityType.ToString().ToUpper())
+                    new InstrumentPlaceOrderModel(instrument, order.Symbol.SecurityType.ToString().ToUpper())
                     )
             };
 
-            var isOrderMarket = order.Type == Orders.OrderType.Market ? true : false;
-
-            var brokerageOrderType = order.Type.ConvertLeanOrderTypeToExchange();
-
-            if (brokerageOrderType != OrderType.Market)
+            if (order.Type != Orders.OrderType.Market)
             {
                 body["complexOrderStrategyType"] = ComplexOrderStrategyType.None.ConvertComplexOrderStrategyTypeToString();
             }
 
-            var limitPrice = 0m;
-            if (!isOrderMarket)
+            if (order.Type == Orders.OrderType.Limit || order.Type == Orders.OrderType.StopLimit)
             {
                 var limitPriceWithoudRound =
                     (order as Orders.LimitOrder)?.LimitPrice ??
                     (order as Orders.StopLimitOrder)?.LimitPrice ?? 0m;
 
-                limitPrice = limitPriceWithoudRound.RoundAmountToExachangeFormat();
+                body["price"] = limitPriceWithoudRound.RoundAmountToExachangeFormat();
             }
 
-            if (brokerageOrderType != OrderType.Market)
-            {
-                body["price"] = limitPrice;
-            }
-
-            body["orderType"] = brokerageOrderType.ConvertOrderTypeToString();
+            body["orderType"] = order.Type.ConvertLeanOrderTypeToExchange().ConvertOrderTypeToString();
             body["session"] = SessionType.Normal.ConvertSessionTypeToString();
             body["duration"] = DurationType.Day.ConvertDurationTypeToString();
             body["orderStrategyType"] = OrderStrategyType.Single.ConvertOrderStrategyTypeToString();
             body["orderLegCollection"] = orderLegCollection;
 
-            var stopPrice = 0m;
-            if (order.Type == Orders.OrderType.StopLimit)
+            if (order.Type == Orders.OrderType.StopMarket || order.Type == Orders.OrderType.StopLimit)
             {
-                var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ?? 0;
-                stopPrice = stopPriceWithoudRound.RoundAmountToExachangeFormat();
-            }
+                var stopPriceWithoudRound = (order as Orders.StopLimitOrder)?.StopPrice ??
+                                    (order as Orders.StopMarketOrder)?.StopPrice ?? 0m;
 
-            if (brokerageOrderType == OrderType.StopLimit)
-            {
-                body["stopPrice"] = stopPrice;
+                body["stopPrice"] = stopPriceWithoudRound.RoundAmountToExachangeFormat(); ;
             }
 
             return JsonConvert.SerializeObject(body);

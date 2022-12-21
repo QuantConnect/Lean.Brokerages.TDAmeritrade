@@ -38,6 +38,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             }
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [Test, TestCaseSource(nameof(TestParameters))]
         public void StreamsData(Symbol symbol, Resolution resolution, bool throwsException)
         {
@@ -127,6 +128,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             cancelationToken.Cancel();
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void MultipleSubscriptions()
         {

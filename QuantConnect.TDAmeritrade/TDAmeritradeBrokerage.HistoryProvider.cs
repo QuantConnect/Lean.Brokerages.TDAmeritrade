@@ -24,7 +24,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 {
     public partial class TDAmeritradeBrokerage
     {
-        private bool _loggedTradierSupportsOnlyTradeBars;
+        private bool _loggedTDASupportsOnlyTradeBars;
 
         /// <summary>
         /// Gets the history for the requested security
@@ -33,7 +33,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <returns>An enumerable of bars covering the span specified in the request</returns>
         public override IEnumerable<BaseData> GetHistory(HistoryRequest request)
         {
-            if (request.Symbol.ID.SecurityType != SecurityType.Equity && request.Symbol.ID.SecurityType != SecurityType.Option)
+            if (request.Symbol.ID.SecurityType != SecurityType.Equity)
             {
                 throw new ArgumentException($"Invalid security type: {request.Symbol.ID.SecurityType}");
             }
@@ -50,11 +50,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (request.TickType != TickType.Trade)
             {
-                if (!_loggedTradierSupportsOnlyTradeBars)
+                if (!_loggedTDASupportsOnlyTradeBars)
                 {
-                    _loggedTradierSupportsOnlyTradeBars = true;
-                    _algorithm?.Debug("Warning: Tradier history provider only supports trade information, does not support quotes.");
-                    Log.Error("TDAmeritradeBrokerage.GetHistory(): Tradier only supports TradeBars");
+                    _loggedTDASupportsOnlyTradeBars = true;
+                    _algorithm?.Debug("Warning: TDAmeritrade history provider only supports trade information, does not support quotes.");
+                    Log.Error("TDAmeritradeBrokerage.GetHistory(): TDAmeritrade only supports TradeBars");
                 }
                 yield break;
             }

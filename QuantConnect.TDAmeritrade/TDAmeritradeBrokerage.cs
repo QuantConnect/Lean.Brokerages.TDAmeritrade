@@ -73,6 +73,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// </summary>
         private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
+        private ManualResetEvent _onPlaceOrderBrokerageIdResponseEvent = new ManualResetEvent(true);
+
         /// <summary>
         /// Creates a new TDAmeritradeBrokerage
         /// </summary>
@@ -100,18 +102,19 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region TD Ameritrade client
 
-        private T Execute<T>(RestRequest request)
+        private T? Execute<T>(RestRequest request)
         {
-            var response = default(T);
-
             var untypedResponse = RestClient.Execute(request);
 
             if (!untypedResponse.IsSuccessful)
             {
                 if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
-                    PostAccessToken(GrantType.RefreshToken, string.Empty);
-                    Execute<T>(request);
+                    // Get new access token
+                    var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
+                    // Update access token in request parameter
+                    RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
+                    untypedResponse = RestClient.Execute(request);
                 }
                 else if (request.Resource == "oauth2/token")
                 {
@@ -122,7 +125,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var fault = JsonConvert.DeserializeObject<ErrorModel>(untypedResponse.Content);
                     Log.Error($"{"TDAmeritrade.Execute." + request.Resource}(2): Parameters: {string.Join(",", request.Parameters.Select(x => x.Name + ": " + x.Value))} Response: {untypedResponse.Content}");
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "TDAmeritradeFault", "Error Detail from object"));
-                    return (T)(object)fault.Error;
                 }
             }
 
@@ -139,36 +141,39 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             catch (Exception e)
             {
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, "JsonError", $"Error deserializing message: {untypedResponse.Content} Error: {e.Message}"));
+                return default;
             }
-
-            return response;
         }
 
         public override bool PlaceOrder(Order order)
         {
+            _onPlaceOrderBrokerageIdResponseEvent.Reset();
             var placeOrderResponse = PostPlaceOrder(order);
 
             if (!string.IsNullOrEmpty(placeOrderResponse))
             {
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = placeOrderResponse });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, placeOrderResponse));
+                _onPlaceOrderBrokerageIdResponseEvent.Set();
                 return false;
             }
 
             // If we haven't gotten response from WebSocket than we stop our algorithm.
             if(!WaitWebSocketResponse(_onSumbitOrderWebSocketResponseEvent, OrderStatus.Submitted))
             {
+                _onPlaceOrderBrokerageIdResponseEvent.Set();
                 return false;
             }
 
             // After we have gotten websocket, we will dequeue order from queue
-            _submitedOrders.TryDequeue(out var orderResponse);
-
-            order.BrokerId.Add(orderResponse.OrderId.ToStringInvariant());
-
-            OnOrderEvent(new OrderEvent(order, orderResponse.EnteredTime, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") { Status = OrderStatus.Submitted });
+            _submittedOrderIds.TryDequeue(out var orderIdResponse);
+            order.BrokerId.Add(orderIdResponse);
+        
+            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
+            { Status = OrderStatus.Submitted });
             Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
-
+            
+            _onPlaceOrderBrokerageIdResponseEvent.Set();
             return true;
         }
 
@@ -197,19 +202,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return false;
             }
 
-            // If we haven't gotten response from WebSocket than we stop our algorithm
-            if (!WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted))
-            {
-                return false;
-            }
-
-            var orderResponse = _cachedOrdersFromWebSocket[order.BrokerId.First().ToStringInvariant()];
-
-            // replace the brokerage order id
-            order.BrokerId[0] = orderResponse.OrderId.ToStringInvariant();
-
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
-
             return true;
         }
 
@@ -233,17 +225,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var isCancelSuccess = CancelOrder(id);
 
-                // If we haven't gotten response from WebSocket than we stop our algorithm
-                if (!WaitWebSocketResponse(_onCancelOrderWebSocketResponseEvent, OrderStatus.Canceled))
-                {
-                    return false;
-                }
-
-                if (isCancelSuccess)
-                {
-                    success.Add(isCancelSuccess);
-                    OnOrderEvent(new OrderEvent(order,DateTime.UtcNow,OrderFee.Zero,"TDAmeritrade Order Event"){ Status = OrderStatus.Canceled });
-                }
+                success.Add(isCancelSuccess);
             }
 
             return success.All(a => a);
@@ -253,7 +235,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var orders = new List<Order>();
 
-            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Pending_Activation);
+            var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Working);
 
             foreach (var openOrder in openOrders)
             {
@@ -269,15 +251,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var holdings = new List<Holding>(positions.Count);
 
+            var quotes = GetQuotesLastPrice(positions.Select(x => x.ProjectedBalances.Symbol));
+
             foreach (var hold in positions)
             {
-                var symbol = Symbol.Create(hold.ProjectedBalances.Symbol, SecurityType.Equity, Market.USA);
+                var brokerageSymbol = hold.ProjectedBalances.Symbol;
+                var leanSecurityType = hold.ProjectedBalances.AssetType.ConvertBrokerageSecurityTypeToLeanSecurityType();
+
+                var symbol = _symbolMapper.GetLeanSymbol(brokerageSymbol, leanSecurityType, Market.USA);
 
                 holdings.Add(new Holding()
                 {
                     Symbol = symbol,
                     AveragePrice = hold.AveragePrice,
-                    MarketPrice = hold.MarketValue,
+                    MarketPrice = quotes[brokerageSymbol],
                     Quantity = hold.LongQuantity + hold.ShortQuantity,
                     MarketValue = hold.MarketValue
                 });
@@ -315,7 +302,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             if (!string.IsNullOrEmpty(_refreshToken))
             {
-                PostAccessToken(GrantType.RefreshToken, string.Empty);
+                var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
+                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
             }
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);

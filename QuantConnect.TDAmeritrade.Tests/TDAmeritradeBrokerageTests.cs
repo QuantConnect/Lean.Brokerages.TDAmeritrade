@@ -13,13 +13,10 @@
  * limitations under the License.
 */
 
-using NodaTime;
 using NUnit.Framework;
-using QuantConnect.Data;
 using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
-using QuantConnect.Data.Market;
 using QuantConnect.Configuration;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Brokerages.TDAmeritrade;
@@ -46,101 +43,41 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         protected override decimal GetAskPrice(Symbol symbol)
         {
-            var tradier = (TDAmeritradeBrokerage)Brokerage;
-            var quotes = tradier.GetQuotes(symbol);
+            var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
+            var quotes = tdameritrade.GetQuotes(symbol);
             return quotes.Single().AskPrice;
         }
 
+        [Explicit("This test requires a configured and testable account")]
         [Test]
         public void GetQuotesDoesNotReturnNull()
         {
-            var tradier = (TDAmeritradeBrokerage)Brokerage;
-            var quotes = tradier.GetQuotes(Symbol.Value);
+            var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
+            var quotes = tdameritrade.GetQuotes(Symbol.Value);
 
             Assert.IsNotNull(quotes);
             Assert.IsNotEmpty(quotes);
         }
 
-        [TestCase("AAPL", Resolution.Minute)]
-        [TestCase("AAPL", Resolution.Hour)]
-        [TestCase("AAPL", Resolution.Daily)]
-        public void TestHistoryProvider_GetHistory(string ticker, Resolution resolution)
+        /// <summary>
+        /// Provides the data required to test each order type in various cases
+        /// </summary>
+        private static TestCaseData[] OrderParameters()
         {
-            var symbol = Symbol.Create(ticker, SecurityType.Equity, Market.USA);
-
-            DateTime startDateTime = DateTime.UtcNow.AddDays(-2.0);
-            DateTime endDateTime = DateTime.UtcNow;
-
-            var historyRequest = new HistoryRequest(
-                new SubscriptionDataConfig(typeof(TradeBar), symbol, resolution, DateTimeZone.Utc, DateTimeZone.Utc, true, true, true),
-                SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
-                startDateTime,
-                endDateTime);
-
-            var histories = Brokerage.GetHistory(historyRequest);
-
-            Assert.IsNotEmpty(histories);
-
-            var history = histories.FirstOrDefault();
-
-            Assert.IsNotNull(history);
-
-            Assert.Greater(history.Price, 0m);
-            Assert.Greater(history.Value, 0m);
-            Assert.That(history.Symbol.Value, Is.EqualTo(ticker).NoClip);
-
-            Assert.IsTrue(history.DataType == MarketDataType.TradeBar);
-
-            TradeBar historyBar = (TradeBar)history;
-
-            Assert.Greater(historyBar.Low, 0m);
-            Assert.Greater(historyBar.Close, 0m);
-            Assert.Greater(historyBar.High, 0m);
-            Assert.Greater(historyBar.Open, 0m);
-
+            return new[]
+            {
+                new TestCaseData(new MarketOrderTestParameters(Symbols.LODE)).SetName("MarketOrder"),
+                new TestCaseData(new LimitOrderTestParameters(Symbols.LODE, 1m, 0.01m)).SetName("LimitOrder"),
+                new TestCaseData(new StopMarketOrderTestParameters(Symbols.LODE, 1m, 0.01m)).SetName("StopMarketOrder"),
+                new TestCaseData(new StopLimitOrderTestParameters(Symbols.LODE, 0.5m, 0.51m)).SetName("StopLimitOrder")
+            };
         }
 
-        //[Ignore("Ignore to save cash")]
-        [Test]
-        public void PlaceOrderMarket()
+        [Explicit("This test requires a configured and testable account")]
+        [Test, TestCaseSource(nameof(OrderParameters))]
+        public override void LongFromZero(OrderTestParameters parameters)
         {
-            var symbol = Symbols.LODE;
-
-            var order = new MarketOrder(symbol, 1, DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
-        }
-
-        [Ignore("Ignore to save cash")]
-        [Test]
-        public void PlaceOrderLimit()
-        {
-            var symbol = Symbols.LODE;
-
-            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
-
-            var order = new LimitOrder(symbol, 1, price + (price * 0.1m), DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
-        }
-
-        [Ignore("Ignore to save cash")]
-        [Test]
-        public void PlaceOrderStopLimit()
-        {
-            var symbol = Symbols.LODE;
-
-            var price = ((TDAmeritradeBrokerage)Brokerage).GetQuote(symbol.Value).LastPrice;
-
-            var order = new StopLimitOrder(symbol, 1, price + (price * 0.1m), price + (price * 0.2m), DateTime.UtcNow);
-
-            var isPlaceOrder = Brokerage.PlaceOrder(order);
-
-            Assert.IsTrue(isPlaceOrder);
+            base.LongFromZero(parameters);
         }
     }
 }

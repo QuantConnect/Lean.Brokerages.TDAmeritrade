@@ -37,10 +37,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid symbol: " + (symbol == null ? "null" : symbol.ToString()));
             }
 
-            if (symbol.ID.SecurityType != SecurityType.Equity
-                && symbol.ID.SecurityType != SecurityType.Option
-                && symbol.ID.SecurityType != SecurityType.Index
-                && symbol.ID.SecurityType != SecurityType.IndexOption)
+            if (symbol.ID.SecurityType != SecurityType.Equity)
             {
                 throw new ArgumentException("TDAmeritrade:SymbolMapper:GetBrokerageSymbol(), Invalid security type: " + symbol.ID.SecurityType);
             }
@@ -50,7 +47,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public Symbol GetLeanSymbol(string brokerageSymbol, SecurityType securityType, string market, DateTime expirationDate = default, decimal strike = 0, OptionRight optionRight = OptionRight.Call)
         {
-            throw new NotImplementedException();
+            var leanSymbolFormat = ConvertTDAmeritradeSymbolToLeanSymbol(brokerageSymbol);
+            return Symbol.Create(leanSymbolFormat, securityType, Market.USA);
         }
 
         /// <summary>
@@ -88,10 +86,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string GetMappedTicker(Symbol symbol)
         {
             var ticker = symbol.ID.Symbol;
-            if (symbol.ID.SecurityType == SecurityType.Equity ||
-                symbol.ID.SecurityType == SecurityType.Option ||
-                symbol.ID.SecurityType == SecurityType.Index ||
-                    symbol.ID.SecurityType == SecurityType.IndexOption)
+            if (symbol.ID.SecurityType == SecurityType.Equity)
             {
                 var mapFile = _mapFileProvider.Get(AuxiliaryDataKey.Create(symbol)).ResolveMapFile(symbol);
                 ticker = mapFile.GetMappedSymbol(DateTime.UtcNow, symbol.Value);
@@ -107,6 +102,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             // Lean symbols are equal to TDAmeritrade symbols with dot instead dash
             return leanSymbol.Replace("-", ".");
+        }
+
+        /// <summary>
+        /// Converts TDAmeritrade symbol string to a Lean symbol
+        /// </summary>
+        private static string ConvertTDAmeritradeSymbolToLeanSymbol(string brokerageSymbol)
+        {
+            // Lean symbols are equal to TDAmeritrade symbols with dot instead dash
+            return brokerageSymbol.Replace(".", "-");
         }
     }
 }

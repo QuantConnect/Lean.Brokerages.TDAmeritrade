@@ -63,7 +63,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
             { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))},
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))},
-            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))}
+            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))},
+            { typeof(OrderRouteMessage), new XmlSerializer(typeof(OrderRouteMessage))}
         };
 
         /// <summary>
@@ -569,9 +570,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                     var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
                     HandleOrderFill(orderFill);
                     break;
+                case "TooLateToCancel":
+                    Log.Debug($"TooLateToCancel: {accountActivityData.Value.MessageData}");
+                    break;
                 case "UROUT": // Indicates "You Are Out" - that the order has been canceled
                     var urout = DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
                     HandleUroutResponse(urout);
+                    break;
+                case "OrderRoute":
+                    var orderRoute = DeserializeXMLExecutionResponse<OrderRouteMessage>(accountActivityData.Value.MessageData);
+                    HandleOrderRoute(orderRoute);
                     break;
             }
         }
@@ -667,6 +675,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
+            // We can not update order with UpdateSubmitted status
+            // When we Updated Order the previous order has status canceled
+            if (leanOrder.Status == OrderStatus.UpdateSubmitted)
+            {
+                return;
+            }
+
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
             { Status = OrderStatus.Canceled });
         }
@@ -700,6 +715,39 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 }
             }
             return default;
+        }
+
+        /// <summary>
+        /// Sometimes, Brokerage doesn't return response about filled MARKET order.
+        /// But, The brokerage always returns some summary data about orders.
+        /// This method handles summary messages for MARKET Orders, in order to understand if it's filled.
+        /// Other Order types (NOT MARKET) are handled in other methods.
+        /// </summary>
+        /// <see cref="HandleOrderFill(OrderFillMessage?)"/>
+        /// <param name="orderRouteMessage">websocket response</param>
+        private void HandleOrderRoute(OrderRouteMessage? orderRouteMessage)
+        {
+            if (orderRouteMessage == null || orderRouteMessage.Order.OrderType.ToUpper() != "MARKET")
+            {
+                return;
+            }
+
+            var brokerageOrderKey = orderRouteMessage.Order.OrderKey.ToStringInvariant();
+
+            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
+            {
+                return;
+            }
+
+            var fillEvent = new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Fill Event")
+            {
+                // TODO what about partial fills?
+                Status = OrderStatus.Filled,
+                // The fill price should come from the brokerage message not from Lean?
+                FillPrice = leanOrder.Direction == OrderDirection.Buy ? orderRouteMessage.Order.OrderPricing.Bid : orderRouteMessage.Order.OrderPricing.Ask,
+                FillQuantity = orderRouteMessage.Order.OriginalQuantity
+            };
+            OnOrderEvent(fillEvent);
         }
 
         private DefaultOrderBook CreateOrderBookWithEventBestBidAskUpdate(Symbol symbol, EventHandler<BestBidAskUpdatedEventArgs> updateEvent)

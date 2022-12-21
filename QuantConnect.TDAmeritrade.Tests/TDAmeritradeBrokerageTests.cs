@@ -20,6 +20,7 @@ using QuantConnect.Securities;
 using QuantConnect.Configuration;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Brokerages.TDAmeritrade;
+using QuantConnect.Brokerages;
 
 namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 {
@@ -80,24 +81,25 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             base.LongFromZero(parameters);
         }
 
-        private static TestCaseData[] ShortOrderParameters()
+        [Explicit("This test requires a configured and testable account")]
+        [Test]
+        public void RejectedOrderForInvalidSymbol()
         {
+            var message = string.Empty;
+            EventHandler<BrokerageMessageEvent> messageHandler = (s, e) => { message = e.Message; };
+
+            Brokerage.Message += messageHandler;
+
+            var symbol = Symbol.Create("XYZ", SecurityType.Equity, Market.USA);
             var orderProperties = new OrderProperties();
             orderProperties.TimeInForce = TimeInForce.Day;
-            return new[]
-            {
-                new TestCaseData(new MarketOrderTestParameters(Symbols.LODE, properties: orderProperties)).SetName("MarketOrder"),
-                new TestCaseData(new LimitOrderTestParameters(Symbols.LODE, 1m, 0.26m, properties: orderProperties)).SetName("LimitOrder"),
-                new TestCaseData(new StopMarketOrderTestParameters(Symbols.LODE, 1000m, 0.01m, properties: orderProperties)).SetName("StopMarketOrder"),
-                new TestCaseData(new StopLimitOrderTestParameters(Symbols.LODE, 1000m, 0.01m, properties: orderProperties)).SetName("StopLimitOrder")
-            };
-        }
+            PlaceOrderWaitForStatus(new MarketOrder(symbol, 1, DateTime.Now, properties: orderProperties), OrderStatus.Invalid, allowFailedSubmission: true);
 
-        [Explicit("This test requires a configured and testable account")]
-        [Test, TestCaseSource(nameof(ShortOrderParameters))]
-        public override void ShortFromLong(OrderTestParameters parameters)
-        {
-            base.ShortFromLong(parameters);
+            Brokerage.Message -= messageHandler;
+
+            var messagee = Newtonsoft.Json.JsonConvert.DeserializeObject(message) as Newtonsoft.Json.Linq.JToken;            
+
+            Assert.That(messagee!["error"]!.ToString(), Is.EqualTo("Could not resolve instrument [AssetType: EQUITY, Symbol: XYZ]"));
         }
     }
 }

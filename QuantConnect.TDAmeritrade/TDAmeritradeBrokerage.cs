@@ -64,15 +64,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private ManualResetEvent _onSumbitOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
         /// <summary>
-        /// Thread synchronization event, for successful Cancel Order
-        /// </summary>
-        private ManualResetEvent _onCancelOrderWebSocketResponseEvent = new ManualResetEvent(false);
-
-        /// <summary>
         /// Thread synchronization event, for successful Update Order
         /// </summary>
         private ManualResetEvent _onUpdateOrderWebSocketResponseEvent = new ManualResetEvent(false);
 
+        /// <summary>
+        /// Thread synchronization event, for successful Place Order in Lean 
+        /// </summary>
         private ManualResetEvent _onPlaceOrderBrokerageIdResponseEvent = new ManualResetEvent(true);
 
         /// <summary>
@@ -199,6 +197,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event") { Status = OrderStatus.Invalid, Message = replaceOrderResponse });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, -1, replaceOrderResponse));
+                return false;
+            }
+
+            // If we haven't gotten response from WebSocket than we stop our algorithm.
+            if (!WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted))
+            {
                 return false;
             }
 

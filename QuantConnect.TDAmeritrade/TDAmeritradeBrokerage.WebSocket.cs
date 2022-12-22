@@ -541,7 +541,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             var accountActivityData = content.ToObject<List<AccountActivityResponseModel>>();
 
-            if (accountActivityData == null && accountActivityData.Count == 0)
+            if (accountActivityData == null || accountActivityData.Count == 0)
             {
                 return;
             }

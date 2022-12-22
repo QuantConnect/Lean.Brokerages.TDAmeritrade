@@ -63,7 +63,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             { typeof(OrderEntryRequestMessage), new XmlSerializer(typeof(OrderEntryRequestMessage))},
             { typeof(OrderFillMessage), new XmlSerializer(typeof(OrderFillMessage))},
             { typeof(OrderCancelReplaceRequestMessage), new XmlSerializer(typeof(OrderCancelReplaceRequestMessage))},
-            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))}
+            { typeof(UROUTMessage), new XmlSerializer(typeof(UROUTMessage))},
+            { typeof(OrderRouteMessage), new XmlSerializer(typeof(OrderRouteMessage))}
         };
 
         /// <summary>
@@ -538,41 +539,47 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private void ParseAccountActivity(JToken content)
         {
-            var accountActivityData = content.ToObject<List<AccountActivityResponseModel>>()?.First();
+            var accountActivityData = content.ToObject<List<AccountActivityResponseModel>>();
 
-            if (!accountActivityData.HasValue)
+            if (accountActivityData == null)
             {
                 return;
             }
 
-            switch (accountActivityData.Value.MessageType)
-            {
-                case "SUBSCRIBED":
-                    Log.Debug($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivityData.Value.MessageData}");
-                    break;
-                case "ERROR":
-                    Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivityData.Value.MessageData}");
-                    break;
-                case "OrderCancelRequest": // A request to cancel an order has been received
-                    var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivityData.Value.MessageData);
-                    HandleOrderCancelRequest(candelOrder);
-                    break;
-                case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received
-                    var cancelReplaceOrder = DeserializeXMLExecutionResponse<OrderCancelReplaceRequestMessage>(accountActivityData.Value.MessageData);
-                    HandleOrderCancelReplaceRequest(cancelReplaceOrder);
-                    break;
-                case "OrderEntryRequest": // A new order has been submitted
-                    var newOrder = DeserializeXMLExecutionResponse<OrderEntryRequestMessage>(accountActivityData.Value.MessageData);
-                    HandleSubmitNewOrder(newOrder);
-                    break;
-                case "OrderFill": // An order has been completely filled
-                    var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivityData.Value.MessageData);
-                    HandleOrderFill(orderFill);
-                    break;
-                case "UROUT": // Indicates "You Are Out" - that the order has been canceled
-                    var urout = DeserializeXMLExecutionResponse<UROUTMessage>(accountActivityData.Value.MessageData);
-                    HandleUroutResponse(urout);
-                    break;
+            foreach(var accountActivity in accountActivityData)
+            { 
+                switch (accountActivity.MessageType)
+                {
+                    case "SUBSCRIBED":
+                        Log.Debug($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: subscribed successfully, Description: {accountActivity.MessageData}");
+                        break;
+                    case "ERROR":
+                        Log.Error($"TDAmeritradeBrokerage:DataQueueHandler:OnMessage:AccountAcctivity: not subscribed, Description: {accountActivity.MessageData}");
+                        break;
+                    case "OrderCancelRequest": // A request to cancel an order has been received
+                        var candelOrder = DeserializeXMLExecutionResponse<OrderCancelRequestMessage>(accountActivity.MessageData);
+                        HandleOrderCancelRequest(candelOrder);
+                        break;
+                    case "OrderCancelReplaceRequest": // A request to modify an order (Cancel/Replace) has been received
+                        var cancelReplaceOrder = DeserializeXMLExecutionResponse<OrderCancelReplaceRequestMessage>(accountActivity.MessageData);
+                        HandleOrderCancelReplaceRequest(cancelReplaceOrder);
+                        break;
+                    case "OrderEntryRequest": // A new order has been submitted
+                        var newOrder = DeserializeXMLExecutionResponse<OrderEntryRequestMessage>(accountActivity.MessageData);
+                        HandleSubmitNewOrder(newOrder);
+                        break;
+                    case "OrderFill": // An order has been completely filled
+                        var orderFill = DeserializeXMLExecutionResponse<OrderFillMessage>(accountActivity.MessageData);
+                        HandleOrderFill(orderFill);
+                        break;
+                    case "TooLateToCancel":
+                        Log.Debug($"TooLateToCancel: {accountActivity.MessageData}");
+                        break;
+                    case "UROUT": // Indicates "You Are Out" - that the order has been canceled
+                        var urout = DeserializeXMLExecutionResponse<UROUTMessage>(accountActivity.MessageData);
+                        HandleUroutResponse(urout);
+                        break;
+                }
             }
         }
 
@@ -648,9 +655,21 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            leanOrder.BrokerId[0] = newBrokerageOrderKey;
+            leanOrder.BrokerId.Remove(oldBrokerageOrderKey);
+            leanOrder.BrokerId.Add(newBrokerageOrderKey);
+
+            var updateOrderEvent = new BrokerageOrderIdChangedEvent()
+            {
+                OrderId = leanOrder.Id,
+                BrokerId = leanOrder.BrokerId
+            };
+
+            OnOrderIdChangedEvent(updateOrderEvent);
 
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
+
+            // Reset Event for UpdateOrder mthd()
+            _onUpdateOrderWebSocketResponseEvent.Set();
         }
 
         private void HandleUroutResponse(UROUTMessage? uroutMessage)
@@ -660,12 +679,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var brokerageOrderKey = uroutMessage.Order.OrderKey.ToStringInvariant();
-
-            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
-            {
-                return;
-            }
+            var leanOrder = _orderProvider.GetOrderByBrokerageId(uroutMessage.Order.OrderKey.ToStringInvariant());
 
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
             { Status = OrderStatus.Canceled });

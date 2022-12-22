@@ -263,7 +263,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
                     return OrderStatus.New;
 
                 case OrderStatusType.Working:
-                    return OrderStatus.PartiallyFilled;
+                    return OrderStatus.Submitted;
 
                 default:
                     throw new ArgumentOutOfRangeException();

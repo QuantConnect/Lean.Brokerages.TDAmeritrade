@@ -201,12 +201,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             }
 
             // If we haven't gotten response from WebSocket than we stop our algorithm.
-            if (!WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted))
-            {
-                return false;
-            }
-
-            return true;
+            return WaitWebSocketResponse(_onUpdateOrderWebSocketResponseEvent, OrderStatus.UpdateSubmitted);
         }
 
         private bool WaitWebSocketResponse(ManualResetEvent webSocketEvent, OrderStatus orderStatus)

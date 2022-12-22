@@ -655,20 +655,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
+            leanOrder.BrokerId.Remove(oldBrokerageOrderKey);
+            leanOrder.BrokerId.Add(newBrokerageOrderKey);
+
             var updateOrderEvent = new BrokerageOrderIdChangedEvent()
             {
                 OrderId = leanOrder.Id,
-                BrokerId = new List<string> { newBrokerageOrderKey }
+                BrokerId = leanOrder.BrokerId
             };
 
             OnOrderIdChangedEvent(updateOrderEvent);
 
-            if (!TryGetLeanOrderById(newBrokerageOrderKey, out var newLeanOrder))
-            {
-                return;
-            }
-
-            OnOrderEvent(new OrderEvent(newLeanOrder, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
+            OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero) { Status = OrderStatus.UpdateSubmitted });
 
             // Reset Event for UpdateOrder mthd()
             _onUpdateOrderWebSocketResponseEvent.Set();
@@ -681,12 +679,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var brokerageOrderKey = uroutMessage.Order.OrderKey.ToStringInvariant();
-
-            if (!TryGetLeanOrderById(brokerageOrderKey, out var leanOrder))
-            {
-                return;
-            }
+            var leanOrder = _orderProvider.GetOrderByBrokerageId(uroutMessage.Order.OrderKey.ToStringInvariant());
 
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
             { Status = OrderStatus.Canceled });

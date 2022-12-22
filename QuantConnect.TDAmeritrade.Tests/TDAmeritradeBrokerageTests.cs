@@ -45,7 +45,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
         protected override decimal GetAskPrice(Symbol symbol)
         {
             var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
-            var quotes = tdameritrade.GetQuotes(symbol);
+            var quotes = tdameritrade.GetQuotes(symbol.Value);
             return quotes.Single().AskPrice;
         }
 
@@ -83,6 +83,61 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
         [Explicit("This test requires a configured and testable account")]
         [Test]
+        public void PlaceOrderThenUpdateOrder()
+        {
+            var brokerIdAfterUpdateOrder = string.Empty;
+            List<Order> _orders = new List<Order>();
+            var tdameritrade = (TDAmeritradeBrokerage)Brokerage;
+
+            var limitOrder = new LimitOrder(Symbol, GetDefaultQuantity(), 0.24m, DateTime.UtcNow);
+
+            EventHandler<OrderEvent> brokerageOnOrderStatusChanged = (sender, args) =>
+            {
+                limitOrder.Status = args.Status;
+
+                if (args.Status == OrderStatus.Canceled || args.Status == OrderStatus.Invalid)
+                {
+                    QuantConnect.Logging.Log.Trace("ModifyOrderUntilFilled(): " + limitOrder);
+                    Assert.Fail("Unexpected order status: " + args.Status);
+                }
+            };
+
+            EventHandler<BrokerageOrderIdChangedEvent> brokerageOrderIdChanged = (sender, args) => {
+                brokerIdAfterUpdateOrder = args.BrokerId[0];
+            };
+
+            tdameritrade.OrderIdChanged += brokerageOrderIdChanged;
+            tdameritrade.OrderStatusChanged += brokerageOnOrderStatusChanged;
+
+            OrderProvider.Add(limitOrder);            
+
+            if (!tdameritrade.PlaceOrder(limitOrder))
+            {
+                Assert.Fail("Brokerage failed to place the order: " + limitOrder);
+            }
+
+            var brokerIdAfterPlaceOrder = OrderProvider.GetOpenOrders().Last().BrokerId[0];
+
+            Assert.That(limitOrder.Status, Is.EqualTo(OrderStatus.Submitted));
+
+            var request = new UpdateOrderRequest(DateTime.UtcNow, limitOrder.Id, new UpdateOrderFields { LimitPrice = limitOrder.LimitPrice / 2 });
+
+            limitOrder.ApplyUpdateOrderRequest(request);
+
+            if (!tdameritrade.UpdateOrder(limitOrder))
+            {
+                Assert.Fail("Brokerage failed to update the order: " + limitOrder);
+            }
+
+            Assert.That(brokerIdAfterUpdateOrder, Is.Not.EqualTo(brokerIdAfterPlaceOrder));
+
+            Brokerage.OrderIdChanged -= brokerageOrderIdChanged;
+            Brokerage.OrderStatusChanged -= brokerageOnOrderStatusChanged;
+
+        }
+
+        [Explicit("This test requires a configured and testable account")]
+        [Test]
         public void RejectedOrderForInvalidSymbol()
         {
             var message = string.Empty;
@@ -97,7 +152,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
             Brokerage.Message -= messageHandler;
 
-            var messagee = Newtonsoft.Json.JsonConvert.DeserializeObject(message) as Newtonsoft.Json.Linq.JToken;            
+            var messagee = Newtonsoft.Json.JsonConvert.DeserializeObject(message) as Newtonsoft.Json.Linq.JToken;
 
             Assert.That(messagee!["error"]!.ToString(), Is.EqualTo("Could not resolve instrument [AssetType: EQUITY, Symbol: XYZ]"));
         }

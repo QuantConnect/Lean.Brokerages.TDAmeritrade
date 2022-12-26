@@ -47,6 +47,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// The Refresh Token is lived for 90 days.
         /// </summary>
         private string _refreshToken;
+
+        private object _bearerTokenSessionLock = new();
         /// <summary>
         /// Keep Bearer Token session key and check key valid time
         /// </summary>
@@ -108,10 +110,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private T? Execute<T>(RestRequest request, bool checkAuthorizationToken = true)
         {
-            if (checkAuthorizationToken && isBearerTokenSessionValidOrUpdate())
+            if (checkAuthorizationToken)
             {
+                var bearerToken = GetBearerTokenSession();
                 // Update access token in request parameter
-                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", _bearerTokenSession.BearerToken, ParameterType.HttpHeader));
+                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", bearerToken.BearerToken, ParameterType.HttpHeader));
             }
 
             var untypedResponse = RestClient.Execute(request);
@@ -457,21 +460,22 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// <summary>
         /// Get the current TDAmeritrade bearer token session
         /// </summary>
-        private bool isBearerTokenSessionValidOrUpdate()
+        private TDABearerTokenSession GetBearerTokenSession()
         {
-            if (_bearerTokenSession == null || !_bearerTokenSession.IsValid)
+            lock (_bearerTokenSessionLock)
             {
-                // Remove default parameter, to we get new accessToken correctly
-                RestClient.RemoveDefaultParameter("Authorization");
-                // Get new access token
-                var request = PostAccessToken(GrantType.RefreshToken, string.Empty);
+                if (_bearerTokenSession == null || !_bearerTokenSession.IsValid)
+                {
+                    // Remove default parameter, to we get new accessToken correctly
+                    RestClient.RemoveDefaultParameter("Authorization");
+                    // Get new access token
+                    var request = PostAccessToken(GrantType.RefreshToken, string.Empty);
 
-                _bearerTokenSession = new TDABearerTokenSession(request.TokenType + " " + request.AccessToken);
+                    _bearerTokenSession = new TDABearerTokenSession(request.TokenType + " " + request.AccessToken);
+                }
 
-                return true;
+                return _bearerTokenSession;
             }
-
-            return false;
         }
     }
 }

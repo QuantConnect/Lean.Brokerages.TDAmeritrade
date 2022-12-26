@@ -267,7 +267,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 request.AddParameter(kv.Key, kv.Value, ParameterType.GetOrPost);
             }
 
-            var accessTokens = Execute<AccessTokenModel>(request);
+            var accessTokens = Execute<AccessTokenModel>(request, false);
 
             return accessTokens;
         }

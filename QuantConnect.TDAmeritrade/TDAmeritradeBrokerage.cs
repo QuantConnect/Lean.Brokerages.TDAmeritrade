@@ -43,7 +43,16 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string _consumerKey;
         private string _accessToken;
         private string _accountNumber;
+        /// <summary>
+        /// The Refresh Token is lived for 90 days.
+        /// </summary>
         private string _refreshToken;
+
+        private object _bearerTokenSessionLock = new();
+        /// <summary>
+        /// Keep Bearer Token session key and check key valid time
+        /// </summary>
+        private TDABearerTokenSession _bearerTokenSession;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
         /// <summary>
@@ -55,7 +64,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private IDataAggregator _aggregator;
         private readonly IAlgorithm _algorithm;
         private readonly IOrderProvider _orderProvider;
-
         private TDAmeritradeSymbolMapper _symbolMapper;
 
         /// <summary>
@@ -100,21 +108,20 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #region TD Ameritrade client
 
-        private T? Execute<T>(RestRequest request)
+        private T? Execute<T>(RestRequest request, bool checkAuthorizationToken = true)
         {
+            if (checkAuthorizationToken)
+            {
+                var bearerToken = GetBearerTokenSession();
+                // Update access token in request parameter
+                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", bearerToken.BearerToken, ParameterType.HttpHeader));
+            }
+
             var untypedResponse = RestClient.Execute(request);
 
             if (!untypedResponse.IsSuccessful)
             {
-                if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
-                {
-                    // Get new access token
-                    var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
-                    // Update access token in request parameter
-                    RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
-                    untypedResponse = RestClient.Execute(request);
-                }
-                else if (request.Resource == "oauth2/token")
+                if (request.Resource == "oauth2/token")
                 {
                     throw new BrokerageException($"TDAmeritradeBrokerage.Execute.{request.Resource}: authorization request is invalid, Response:{untypedResponse.Content}");
                 }
@@ -166,11 +173,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             // After we have gotten websocket, we will dequeue order from queue
             _submittedOrderIds.TryDequeue(out var orderIdResponse);
             order.BrokerId.Add(orderIdResponse);
-        
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder") 
+
+            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "TDAmeritrade Order Event SubmitNewOrder")
             { Status = OrderStatus.Submitted });
             Log.Trace($"Order submitted successfully - OrderId: {order.Id}");
-            
+
             _onPlaceOrderBrokerageIdResponseEvent.Set();
             return true;
         }
@@ -297,12 +304,6 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             if (!string.IsNullOrEmpty(_accessToken) && string.IsNullOrEmpty(_refreshToken))
             {
                 _refreshToken = PostAccessToken(GrantType.AuthorizationCode, _accessToken).RefreshToken;
-            }
-
-            if (!string.IsNullOrEmpty(_refreshToken))
-            {
-                var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
-                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));
             }
 
             Initialize(_wsUrl, new WebSocketClientWrapper(), RestClient, null, null);
@@ -453,6 +454,27 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 Log.Error($"ValidateSubscription(): Failed during validation, shutting down. Error : {e.Message}");
                 Environment.Exit(1);
+            }
+        }
+
+        /// <summary>
+        /// Get the current TDAmeritrade bearer token session
+        /// </summary>
+        private TDABearerTokenSession GetBearerTokenSession()
+        {
+            lock (_bearerTokenSessionLock)
+            {
+                if (_bearerTokenSession == null || !_bearerTokenSession.IsValid)
+                {
+                    // Remove default parameter, to we get new accessToken correctly
+                    RestClient.RemoveDefaultParameter("Authorization");
+                    // Get new access token
+                    var request = PostAccessToken(GrantType.RefreshToken, string.Empty);
+
+                    _bearerTokenSession = new TDABearerTokenSession(request.TokenType + " " + request.AccessToken);
+                }
+
+                return _bearerTokenSession;
             }
         }
     }

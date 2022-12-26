@@ -16,17 +16,33 @@
 namespace QuantConnect.Brokerages.TDAmeritrade.Models
 {
     /// <summary>
-    /// The grant type of the oAuth scheme.
+    /// Create a new Bearer token session
     /// </summary>
-    public enum GrantType
+    public class TDABearerTokenSession
     {
         /// <summary>
-        /// Use to get new Refresh Token
+        /// Bearer Authorization token is lived for 1800 seconds (30 minutes)
         /// </summary>
-        AuthorizationCode = 0,
+        private readonly static TimeSpan LifeSpan = TimeSpan.FromSeconds(1730);
         /// <summary>
-        /// Use to get new Bearer Token by Refresh Token
+        /// Bearer Token creating time
         /// </summary>
-        RefreshToken = 1
+        private readonly DateTime _createdTime;
+
+        /// <summary>
+        /// TDAmeritrade Bearer Token
+        /// </summary>
+        public readonly string BearerToken;
+
+        /// <summary>
+        /// Determines if this bearer token session is valid
+        /// </summary>
+        public bool IsValid => DateTime.UtcNow - _createdTime < LifeSpan;
+
+        public TDABearerTokenSession(string bearerToken)
+        {
+            _createdTime = DateTime.UtcNow;
+            BearerToken = bearerToken;
+        }
     }
 }

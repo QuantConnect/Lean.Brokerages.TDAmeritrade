@@ -20,7 +20,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Models
     /// </summary>
     public enum GrantType
     {
+        /// <summary>
+        /// Use to get new Refresh Token
+        /// </summary>
         AuthorizationCode = 0,
+        /// <summary>
+        /// Use to get new Bearer Token by Refresh Token
+        /// </summary>
         RefreshToken = 1
     }
 }

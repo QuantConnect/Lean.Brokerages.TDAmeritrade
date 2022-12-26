@@ -229,10 +229,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         /// The token endpoint returns an access token along with an optional refresh token.
         /// https://developer.tdameritrade.com/authentication/apis/post/token-0
         /// </summary>
+        /// <param name="grantType">The Type of key which you want to get</param>
         /// <param name="code">Required if trying to use authorization code grant</param>
-        /// <param name="redirectUrl">Required if trying to use authorization code grant</param>
         /// <returns></returns>
-        /// <exception cref="Exception"></exception>
         private AccessTokenModel PostAccessToken(GrantType grantType, string code)
         {
             var request = new RestRequest("oauth2/token", Method.POST);

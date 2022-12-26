@@ -43,6 +43,9 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         private string _consumerKey;
         private string _accessToken;
         private string _accountNumber;
+        /// <summary>
+        /// The Refresh Token is lived for 90 days.
+        /// </summary>
         private string _refreshToken;
 
         private string _restApiUrl = "https://api.tdameritrade.com/v1/";
@@ -108,7 +111,10 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 if (untypedResponse.Content.Contains("The access token being passed has expired or is invalid")) // The Access Token has invalid
                 {
+                    // Remove default parameter, to we get new accessToken correctly
+                    RestClient.RemoveDefaultParameter("Authorization");
                     // Get new access token
+                    // REMARK: Authorization token is lived for 1800 seconds (30 minutes)
                     var accessTokens = PostAccessToken(GrantType.RefreshToken, string.Empty);
                     // Update access token in request parameter
                     RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", accessTokens.TokenType + " " + accessTokens.AccessToken, ParameterType.HttpHeader));

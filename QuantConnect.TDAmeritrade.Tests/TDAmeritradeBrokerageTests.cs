@@ -91,14 +91,15 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
 
             var limitOrder = new LimitOrder(Symbol, GetDefaultQuantity(), 0.24m, DateTime.UtcNow);
 
-            EventHandler<OrderEvent> brokerageOnOrderStatusChanged = (sender, args) =>
+            EventHandler<List<OrderEvent>> brokerageOnOrderStatusChanged = (sender, args) =>
             {
-                limitOrder.Status = args.Status;
+                var orderEvent = args.Single();
+                limitOrder.Status = orderEvent.Status;
 
-                if (args.Status == OrderStatus.Canceled || args.Status == OrderStatus.Invalid)
+                if (orderEvent.Status == OrderStatus.Canceled || orderEvent.Status == OrderStatus.Invalid)
                 {
                     QuantConnect.Logging.Log.Trace("ModifyOrderUntilFilled(): " + limitOrder);
-                    Assert.Fail("Unexpected order status: " + args.Status);
+                    Assert.Fail("Unexpected order status: " + orderEvent.Status);
                 }
             };
 
@@ -107,7 +108,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             };
 
             tdameritrade.OrderIdChanged += brokerageOrderIdChanged;
-            tdameritrade.OrderStatusChanged += brokerageOnOrderStatusChanged;
+            tdameritrade.OrdersStatusChanged += brokerageOnOrderStatusChanged;
 
             OrderProvider.Add(limitOrder);            
 
@@ -132,7 +133,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.That(brokerIdAfterUpdateOrder, Is.Not.EqualTo(brokerIdAfterPlaceOrder));
 
             Brokerage.OrderIdChanged -= brokerageOrderIdChanged;
-            Brokerage.OrderStatusChanged -= brokerageOnOrderStatusChanged;
+            Brokerage.OrdersStatusChanged -= brokerageOnOrderStatusChanged;
 
         }
 

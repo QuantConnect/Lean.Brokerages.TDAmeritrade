@@ -679,7 +679,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 return;
             }
 
-            var leanOrder = _orderProvider.GetOrderByBrokerageId(uroutMessage.Order.OrderKey.ToStringInvariant());
+            var key = uroutMessage.Order.OrderKey.ToStringInvariant();
+            var leanOrder = _orderProvider.GetOrdersByBrokerageId(key)?.SingleOrDefault();
+            if (leanOrder == null)
+            {
+                Log.Error($"TDAmeritradeBrokerage.WebSocket.HandleUroutResponse(): lean order not found {key}");
+                return;
+            }
 
             OnOrderEvent(new OrderEvent(leanOrder, DateTime.UtcNow, OrderFee.Zero, "TDAmeritradeBrokerage Cancel Event")
             { Status = OrderStatus.Canceled });
@@ -725,7 +731,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         private bool TryGetLeanOrderById(string orderID, out Order leanOrder)
         {
-            leanOrder = _orderProvider.GetOrderByBrokerageId(orderID);
+            leanOrder = _orderProvider.GetOrdersByBrokerageId(orderID)?.SingleOrDefault();
 
             if (leanOrder == null || leanOrder.Status == OrderStatus.Filled)
             {

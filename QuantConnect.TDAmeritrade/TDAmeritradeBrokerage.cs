@@ -266,11 +266,13 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
                 var symbol = _symbolMapper.GetLeanSymbol(brokerageSymbol, leanSecurityType, Market.USA);
 
-                holdings.Add(new Holding()
+                quotes.TryGetValue(brokerageSymbol, out var marketPrice);
+
+                holdings.Add(new Holding
                 {
                     Symbol = symbol,
                     AveragePrice = hold.AveragePrice,
-                    MarketPrice = quotes[brokerageSymbol],
+                    MarketPrice = marketPrice,
                     Quantity = hold.LongQuantity + hold.ShortQuantity,
                     MarketValue = hold.MarketValue
                 });
@@ -280,7 +282,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         public override List<CashAmount> GetCashBalance()
         {
-            var balance = GetAccount(_accountNumber).SecuritiesAccount.CurrentBalances.AvailableFunds;
+            var balance = GetAccount(_accountNumber).SecuritiesAccount.CurrentBalances.CashBalance;
             return new List<CashAmount>() { new CashAmount(balance, Currencies.USD) };
         }
 

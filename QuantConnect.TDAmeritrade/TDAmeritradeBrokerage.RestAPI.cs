@@ -137,7 +137,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
         {
             if(symbols.Length == 0 || symbols.Any(string.IsNullOrWhiteSpace))
             {
-                throw new ArgumentException("TDAmeritradeBrokerage:GetQuotes(): invalid param");
+                return Enumerable.Empty<QuoteTDAmeritradeModel>();
             }
 
             var request = new RestRequest("marketdata/quotes", Method.GET);

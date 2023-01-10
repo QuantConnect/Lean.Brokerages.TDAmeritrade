@@ -257,25 +257,28 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var holdings = new List<Holding>(positions.Count);
 
-            var quotes = GetQuotesLastPrice(positions.Select(x => x.ProjectedBalances.Symbol));
-
-            foreach (var hold in positions)
+            if(positions.Count > 0)
             {
-                var brokerageSymbol = hold.ProjectedBalances.Symbol;
-                var leanSecurityType = hold.ProjectedBalances.AssetType.ConvertBrokerageSecurityTypeToLeanSecurityType();
+                var quotes = GetQuotesLastPrice(positions.Select(x => x.ProjectedBalances.Symbol));
 
-                var symbol = _symbolMapper.GetLeanSymbol(brokerageSymbol, leanSecurityType, Market.USA);
-
-                quotes.TryGetValue(brokerageSymbol, out var marketPrice);
-
-                holdings.Add(new Holding
+                foreach (var hold in positions)
                 {
-                    Symbol = symbol,
-                    AveragePrice = hold.AveragePrice,
-                    MarketPrice = marketPrice,
-                    Quantity = hold.LongQuantity + hold.ShortQuantity,
-                    MarketValue = hold.MarketValue
-                });
+                    var brokerageSymbol = hold.ProjectedBalances.Symbol;
+                    var leanSecurityType = hold.ProjectedBalances.AssetType.ConvertBrokerageSecurityTypeToLeanSecurityType();
+
+                    var symbol = _symbolMapper.GetLeanSymbol(brokerageSymbol, leanSecurityType, Market.USA);
+
+                    quotes.TryGetValue(brokerageSymbol, out var marketPrice);
+
+                    holdings.Add(new Holding
+                    {
+                        Symbol = symbol,
+                        AveragePrice = hold.AveragePrice,
+                        MarketPrice = marketPrice,
+                        Quantity = hold.LongQuantity + hold.ShortQuantity,
+                        MarketValue = hold.MarketValue
+                    });
+                }
             }
             return holdings;
         }

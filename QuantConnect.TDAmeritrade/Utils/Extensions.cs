@@ -13,7 +13,9 @@
  * limitations under the License.
 */
 
+using Newtonsoft.Json;
 using QuantConnect.Brokerages.TDAmeritrade.Models;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
 using OrderTypeBrokerage = QuantConnect.Brokerages.TDAmeritrade.Models.OrderType;
 
@@ -191,9 +193,15 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
             _ => throw new ArgumentOutOfRangeException(nameof(resolution), $"Not expected Resolution value: {resolution}")
         };
 
-        public static Order ConvertOrder(this OrderModel order)
+        public static Order? ConvertOrder(this OrderModel order)
         {
             Order qcOrder;
+
+            if(order.OrderLegCollections.Count != 1)
+            {
+                Log.Error($"Extensions.ConvertOrder(): unexpected open order ignoring: '{JsonConvert.SerializeObject(order, Formatting.None)}'");
+                return null;
+            }
 
             var symbol = order.OrderLegCollections[0].Instrument.Symbol;
             var quantity = ConvertQuantity(order.Quantity, order.OrderLegCollections[0].InstructionType.ConvertStringToInstructionType());

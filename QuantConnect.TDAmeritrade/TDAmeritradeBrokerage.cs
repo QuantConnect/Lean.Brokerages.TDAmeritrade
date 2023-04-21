@@ -243,9 +243,17 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
             var openOrders = GetOrdersByPath(toEnteredTime: DateTime.Today, orderStatusType: OrderStatusType.Working);
 
-            foreach (var openOrder in openOrders)
+            foreach (var openOrder in openOrders.Where(order => order != null))
             {
-                orders.Add(openOrder.ConvertOrder());
+                var convertedOrder = openOrder.ConvertOrder();
+                if (convertedOrder != null)
+                {
+                    orders.Add(convertedOrder);
+                }
+                else
+                {
+                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, 0, $"Unexpected open order. Id: {openOrder.OrderId}"));
+                }
             }
 
             return orders;

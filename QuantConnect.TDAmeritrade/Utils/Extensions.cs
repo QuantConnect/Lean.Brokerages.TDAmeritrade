@@ -305,7 +305,8 @@ namespace QuantConnect.Brokerages.TDAmeritrade.Utils
         public static SecurityType ConvertBrokerageSecurityTypeToLeanSecurityType(this string brokerageSecurityType) => brokerageSecurityType switch
         {
             "EQUITY" => SecurityType.Equity,
-            _ => throw new ArgumentException($"TDAmeritrade doesn't support of SecurityType {nameof(brokerageSecurityType)}")
+            _ => throw new ArgumentException($"TDAmeritrade doesn't support brokerage security type {brokerageSecurityType}. " +
+                $"Only {SecurityType.Equity} is currently supported.")
         };
     }
 }

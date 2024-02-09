@@ -1,0 +1,16 @@
+{
+	"description": "TDAmeritrade is a large US multi-asset brokerage. The QuantConnect integration supports Equities trading on cash or margin accounts. As TDAmeritrade is now merging with Schwab new users are not able to create an API.",
+	"platforms-features":[
+		{
+			"Platforms": ["Cloud Platform", "Local Platform", "LEAN CLI"],
+			"Download Data": [1,1,1],
+			"Backtesting": [1,1,1],
+			"Optimization": [1,1,1],
+			"Live Trading":	[1,1,1]
+		}
+	],
+	"order-types": ["Market", "Limit", "Stop Market",  "Stop Limit" ],
+	"assets": [ "Equity" ], 
+	"brokerage-url": "https://www.tdameritrade.com/",
+  "documentation": "/docs/v2/cloud-platform/live-trading/brokerages/td-ameritrade"
+}

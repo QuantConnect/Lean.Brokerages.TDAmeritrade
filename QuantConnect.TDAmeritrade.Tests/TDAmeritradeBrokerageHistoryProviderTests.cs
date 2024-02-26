@@ -62,5 +62,43 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             Assert.Greater(historyBar.Open, 0m);
 
         }
+
+        private static IEnumerable<TestCaseData> InvalidHistoryTestCases
+        {
+            get
+            {
+                // invalid security type
+                yield return new TestCaseData(Symbols.BTCUSD, Resolution.Daily, TickType.Trade, TimeSpan.FromDays(15));
+                yield return new TestCaseData(Symbols.SPY_C_192_Feb19_2016, Resolution.Daily, TickType.Trade, TimeSpan.FromDays(15));
+
+                // invalid resolution
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Tick, TickType.Trade, TimeSpan.FromDays(15));
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Second, TickType.Trade, TimeSpan.FromDays(15));
+
+                // invalid tick type
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Daily, TickType.Quote, TimeSpan.FromDays(15));
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Daily, TickType.OpenInterest, TimeSpan.FromDays(15));
+
+                // invalid date range
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Daily, TickType.Trade, TimeSpan.FromDays(0));
+                yield return new TestCaseData(Symbols.AAPL, Resolution.Daily, TickType.Trade, TimeSpan.FromDays(-15));
+            }
+        }
+
+        [Explicit("This test requires a configured and testable account")]
+        [TestCaseSource(nameof(InvalidHistoryTestCases))]
+        public void HistoryReturnsNullForUnsupportedRequests(Symbol symbol, Resolution resolution, TickType tickType, TimeSpan period)
+        {
+            var endTime = new DateTime(2022, 08, 19);
+            var historyRequest = new HistoryRequest(
+                new SubscriptionDataConfig(typeof(TradeBar), symbol, resolution, DateTimeZone.Utc, DateTimeZone.Utc, true, true, true, tickType: tickType),
+                SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
+                endTime.Subtract(period),
+                endTime);
+
+            var history = Brokerage.GetHistory(historyRequest);
+
+            Assert.IsNull(history);
+        }
     }
 }

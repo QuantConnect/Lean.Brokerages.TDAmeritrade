@@ -60,9 +60,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
                 throw new BrokerageException($"TDAmeritradeBrokerageFactory invalid config keys, errors:{String.Join(';', errors)}");
             }
 
-            var brokerage = new TDAmeritradeBrokerage(consumerKey, accessToken, accountNumber, algorithm,
-                Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false), algorithm.Transactions,
-                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")));
+            var brokerage = new TDAmeritradeBrokerage(consumerKey, accessToken, accountNumber, algorithm, algorithm.Transactions);
 
             // Add the brokerage to the composer to ensure its accessible to the live data feed.
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

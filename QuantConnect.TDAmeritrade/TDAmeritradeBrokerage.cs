@@ -96,14 +96,12 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             string accessToken,
             string accountNumber,
             IAlgorithm algorithm,
-            IDataAggregator aggregator,
-            IOrderProvider orderProvider,
-            IMapFileProvider mapFileProvider) : base("TD Ameritrade")
+            IOrderProvider orderProvider) : base("TD Ameritrade")
         {
             _algorithm = algorithm;
             _orderProvider = orderProvider;
 
-            Initialize(consumerKey, accessToken, accountNumber, mapFileProvider, aggregator);
+            Initialize(consumerKey, accessToken, accountNumber);
         }
 
         #region TD Ameritrade client
@@ -299,17 +297,18 @@ namespace QuantConnect.Brokerages.TDAmeritrade
 
         #endregion
 
-        private void Initialize(string consumerKey, string accessToken, string accountNumber, IMapFileProvider mapFileProvider, IDataAggregator aggregator)
+        private void Initialize(string consumerKey, string accessToken, string accountNumber)
         {
             if (IsInitialized)
             {
                 return;
             }
 
-            _aggregator = aggregator;
+            _aggregator = Composer.Instance.GetPart<IDataAggregator>();
             _consumerKey = consumerKey;
             _accessToken = accessToken;
             _accountNumber = accountNumber;
+            var mapFileProvider = Composer.Instance.GetPart<IMapFileProvider>();
             _symbolMapper = new TDAmeritradeSymbolMapper(mapFileProvider);
 
             RestClient = new RestClient(_restApiUrl);

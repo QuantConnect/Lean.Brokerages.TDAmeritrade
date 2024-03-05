@@ -88,15 +88,11 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             var consumerKey = job.BrokerageData["tdameritrade-api-key"];
             var accessToken = job.BrokerageData["tdameritrade-access-token"];
             var accountNumber = job.BrokerageData["tdameritrade-account-number"];
-            var aggregator = Composer.Instance.GetExportedValueByTypeName<IDataAggregator>(
-                Config.Get("data-aggregator", "QuantConnect.Lean.Engine.DataFeeds.AggregationManager"), forceTypeNameOnExisting: false);
 
             Initialize(
                 consumerKey,
                 accessToken,
-                accountNumber,
-                Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider")),
-                aggregator);
+                accountNumber);
 
             if (!IsConnected)
             {

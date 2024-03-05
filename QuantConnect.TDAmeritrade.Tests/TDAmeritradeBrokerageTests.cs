@@ -18,7 +18,6 @@ using QuantConnect.Orders;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Configuration;
-using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Brokerages.TDAmeritrade;
 using QuantConnect.Brokerages;
 
@@ -36,7 +35,7 @@ namespace QuantConnect.Tests.Brokerages.TDAmeritrade
             string _codeFromUrl = Config.Get("tdameritrade-access-token");
             string _accountNumber = Config.Get("tdameritrade-account-number");
 
-            return new TDAmeritradeBrokerage(_consumerKey, _codeFromUrl, _accountNumber, null, new AggregationManager(), orderProvider, TestGlobals.MapFileProvider);
+            return new TDAmeritradeBrokerage(_consumerKey, _codeFromUrl, _accountNumber, null, orderProvider);
         }
 
         protected override bool IsAsync() => true;

@@ -112,7 +112,7 @@ namespace QuantConnect.Brokerages.TDAmeritrade
             {
                 var bearerToken = GetBearerTokenSession();
                 // Update access token in request parameter
-                RestClient.AddOrUpdateDefaultParameter(new Parameter("Authorization", bearerToken.BearerToken, ParameterType.HttpHeader));
+                RestClient.AddOrUpdateDefaultParameter(new RestSharp.Parameter("Authorization", bearerToken.BearerToken, ParameterType.HttpHeader));
             }
 
             var untypedResponse = RestClient.Execute(request);
